@@ -1,7 +1,7 @@
 mod boids;
 mod math;
 
-use crate::boids::{update_boid_transforms, Bird, BoidSettings};
+use crate::boids::{update_boid_transforms, Boid, BoidSettings};
 use crate::math::how_much_right_or_left;
 use bevy::asset::AssetServerSettings;
 use bevy::prelude::*;
@@ -65,6 +65,6 @@ fn setup(mut commands: Commands, asset_server: ResMut<AssetServer>) {
                 ..Default::default()
             })
             .insert(Name::new(format!("Boid {x}")))
-            .insert(Bird::default());
+            .insert(Boid::default());
     }
 }

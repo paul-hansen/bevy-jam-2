@@ -39,10 +39,10 @@ impl Default for BoidSettings {
 }
 
 #[derive(Component, Default)]
-pub struct Bird {}
+pub struct Boid {}
 
 pub fn update_boid_transforms(
-    mut boid_transforms: Query<&mut Transform, With<Bird>>,
+    mut boid_transforms: Query<&mut Transform, With<Boid>>,
     time: Res<Time>,
     windows: Res<Windows>,
     mut lines: ResMut<DebugLines>,
