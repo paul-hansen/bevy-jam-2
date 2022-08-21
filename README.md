@@ -12,7 +12,7 @@ You can find the latest download under ["assets" here](https://github.com/paul-h
 
 ## Project status
 It's very WIP right now, it only has a basic [boid behavior](https://en.wikipedia.org/wiki/Boids) implemented (and even that can use some work). Fun to play around with the settings though.
-![Alt Text](screenshots/bevy-game-jam-2.gif)
+![2d top down view of flying triangles exhibiting somewhat bird-like flocking behavior](screenshots/bevy-game-jam-2.gif)
 
 ## License
 
