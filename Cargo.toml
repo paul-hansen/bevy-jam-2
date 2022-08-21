@@ -1,0 +1,19 @@
+[package]
+name = "bevy-jam-2"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+bevy = "0.8.0"
+turborand = "0.6.0"
+bevy-inspector-egui = "0.12.1"
+bevy_prototype_debug_lines = "0.8.1"
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
