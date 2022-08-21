@@ -96,7 +96,6 @@ fn update_boid_transforms(
 ) {
     let boid_positions: Vec<Vec3> = transforms.iter().map(|t| t.translation).collect();
     for mut transform in transforms.iter_mut() {
-        let right = transform.right().truncate();
         let mut turn_directions: Vec<f32> = Vec::new();
         let position = transform.translation;
 
@@ -141,37 +140,15 @@ fn update_boid_transforms(
             turn_directions.push(cohesion_turn_factor);
         }
 
-        let separation_boids: Vec<Vec3> = boid_positions
-            .iter()
-            .filter(|t| t.distance(position) < app_config.boid_separation_distance)
-            .filter(|t| **t != position)
-            .cloned()
-            .collect();
-        turn_directions.append(
-            &mut separation_boids
-                .iter()
-                .map(|target| {
-                    let direction_to_target = (*target - position).truncate().normalize();
-
-                    // The dot product when used with normalized vectors tells you how parallel
-                    // a vector is to another.
-                    // Negative values means it is facing the opposite way,
-                    // so if we use the right facing vector, the result will be -1.0 to 1.0 based on
-                    // how much to the right the target is from the current boid.
-                    let direction = right.dot(direction_to_target);
-                    if app_config.debug_lines {
-                        lines.line_gradient(
-                            transform.translation,
-                            ((*target - transform.translation) * 0.5) + transform.translation,
-                            0.0,
-                            Color::rgba(1.0, 0.0, 0.0, (direction + 1.0) / 2.0),
-                            Color::rgba(1.0, 0.0, 0.0, 0.2),
-                        );
-                    }
-                    direction
-                })
-                .collect(),
-        );
+        turn_directions.append(&mut boid_separation(
+            &transform,
+            app_config.boid_separation_distance,
+            &boid_positions,
+            match app_config.debug_lines {
+                true => Some(&mut lines),
+                false => None,
+            },
+        ));
 
         let final_turn_direction = match turn_directions.is_empty() {
             true => 0.0,
@@ -241,4 +218,43 @@ fn boid_cohesion(
         );
     }
     turn_direction_to_center_of_near
+}
+
+fn boid_separation(
+    transform: &Transform,
+    boid_separation_distance: f32,
+    boid_positions: &[Vec3],
+    mut lines: Option<&mut DebugLines>,
+) -> Vec<f32> {
+    let position = transform.translation;
+    let separation_boids: Vec<Vec3> = boid_positions
+        .iter()
+        .filter(|t| t.distance(position) < boid_separation_distance)
+        .filter(|t| **t != position)
+        .cloned()
+        .collect();
+
+    separation_boids
+        .iter()
+        .map(|target| {
+            let direction_to_target = (*target - position).truncate().normalize();
+
+            // The dot product when used with normalized vectors tells you how parallel
+            // a vector is to another.
+            // Negative values means it is facing the opposite way,
+            // so if we use the right facing vector, the result will be -1.0 to 1.0 based on
+            // how much to the right the target is from the current boid.
+            let direction = transform.right().truncate().dot(direction_to_target);
+            if let Some(lines) = &mut lines {
+                lines.line_gradient(
+                    transform.translation,
+                    ((*target - transform.translation) * 0.5) + transform.translation,
+                    0.0,
+                    Color::rgba(1.0, 0.0, 0.0, (direction + 1.0) / 2.0),
+                    Color::rgba(1.0, 0.0, 0.0, 0.2),
+                );
+            }
+            direction
+        })
+        .collect()
 }
