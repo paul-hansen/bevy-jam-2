@@ -1,7 +1,7 @@
 use bevy::asset::AssetServerSettings;
 use bevy::prelude::*;
 use bevy::render::camera::ScalingMode;
-use bevy_inspector_egui::{Inspectable, InspectorPlugin, WorldInspectorPlugin};
+use bevy_inspector_egui::{Inspectable, InspectorPlugin};
 use bevy_prototype_debug_lines::{DebugLines, DebugLinesPlugin};
 use std::f32::consts::PI;
 use turborand::prelude::*;
@@ -47,24 +47,28 @@ impl Default for BoidSettings {
 }
 
 fn main() {
-    App::new()
-        .insert_resource(WindowDescriptor {
-            fit_canvas_to_parent: true,
-            ..Default::default()
-        })
-        .insert_resource(AssetServerSettings {
-            watch_for_changes: true,
-            ..default()
-        })
-        .insert_resource(BoidSettings::default())
-        .insert_resource(ClearColor(Color::hex("6c99c0").unwrap()))
-        .add_plugins(DefaultPlugins)
-        .add_plugin(WorldInspectorPlugin::new())
-        .add_plugin(InspectorPlugin::<BoidSettings>::new())
-        .add_plugin(DebugLinesPlugin::default())
-        .add_startup_system(setup)
-        .add_system(update_boid_transforms)
-        .run();
+    let mut app = App::new();
+    app.insert_resource(WindowDescriptor {
+        fit_canvas_to_parent: true,
+        ..Default::default()
+    })
+    .insert_resource(Msaa { samples: 4 })
+    .insert_resource(AssetServerSettings {
+        watch_for_changes: true,
+        ..default()
+    })
+    .insert_resource(BoidSettings::default())
+    .insert_resource(ClearColor(Color::hex("6c99c0").unwrap()))
+    .add_plugins(DefaultPlugins)
+    .add_plugin(InspectorPlugin::<BoidSettings>::new())
+    .add_plugin(DebugLinesPlugin::default())
+    .add_startup_system(setup)
+    .add_system(update_boid_transforms);
+
+    #[cfg(debug_assertions)]
+    app.add_plugin(bevy_inspector_egui::WorldInspectorPlugin::new());
+
+    app.run();
 }
 
 fn setup(mut commands: Commands, asset_server: ResMut<AssetServer>) {
