@@ -39,6 +39,10 @@ impl Default for AppConfig {
 
 fn main() {
     App::new()
+        .insert_resource(WindowDescriptor {
+            fit_canvas_to_parent: true,
+            ..Default::default()
+        })
         .insert_resource(AssetServerSettings {
             watch_for_changes: true,
             ..default()
