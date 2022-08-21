@@ -36,8 +36,8 @@ impl Default for BoidSettings {
             cohesion_enabled: true,
             separation_enabled: true,
             alignment_enabled: true,
-            speed: 180.0,
-            max_turn_rate_per_second: PI * 0.8,
+            speed: 80.0,
+            max_turn_rate_per_second: PI * 5.8,
             separation_distance: 72.0,
             cohesion_distance: 120.0,
             alignment_distance: 120.0,
@@ -88,7 +88,7 @@ fn setup(mut commands: Commands, asset_server: ResMut<AssetServer>) {
                     x as f32,
                 )
                 .with_rotation(Quat::from_rotation_z(rand.f32_normalized() * PI * 2.0))
-                .with_scale(Vec3::splat(0.03)),
+                .with_scale(Vec3::splat(0.01)),
                 ..Default::default()
             })
             .insert(Name::new(format!("Boid {x}")))
