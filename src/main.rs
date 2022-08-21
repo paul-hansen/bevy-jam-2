@@ -10,28 +10,37 @@ use turborand::prelude::*;
 pub struct Bird {}
 
 const SCENE_HEIGHT: f32 = 800.0;
-const BOID_COUNT: usize = 80;
+const BOID_COUNT: usize = 500;
 
 #[derive(Inspectable, Debug)]
-pub struct AppConfig {
+pub struct BoidSettings {
+    cohesion_enabled: bool,
+    separation_enabled: bool,
+    alignment_enabled: bool,
     #[inspectable(min = 0.0, max = 9999.0)]
-    boid_speed: f32,
+    speed: f32,
     #[inspectable(min = 0.0, max = PI * 180.0)]
-    boid_max_turn_rate_per_second: f32,
+    max_turn_rate_per_second: f32,
     #[inspectable(min = 0.0, max = 1000.0)]
-    boid_separation_distance: f32,
+    separation_distance: f32,
     #[inspectable(min = 0.0, max = 1000.0)]
-    boid_cohesion_distance: f32,
+    cohesion_distance: f32,
+    #[inspectable(min = 0.0, max = 1000.0)]
+    alignment_distance: f32,
     debug_lines: bool,
 }
 
-impl Default for AppConfig {
+impl Default for BoidSettings {
     fn default() -> Self {
         Self {
-            boid_speed: 100.0,
-            boid_max_turn_rate_per_second: PI * 1.5,
-            boid_separation_distance: 50.0,
-            boid_cohesion_distance: 120.0,
+            cohesion_enabled: true,
+            separation_enabled: true,
+            alignment_enabled: true,
+            speed: 180.0,
+            max_turn_rate_per_second: PI * 0.8,
+            separation_distance: 72.0,
+            cohesion_distance: 120.0,
+            alignment_distance: 120.0,
             debug_lines: false,
         }
     }
@@ -47,11 +56,11 @@ fn main() {
             watch_for_changes: true,
             ..default()
         })
-        .insert_resource(AppConfig::default())
-        .insert_resource(ClearColor(Color::hex("94aed6").unwrap()))
+        .insert_resource(BoidSettings::default())
+        .insert_resource(ClearColor(Color::hex("6c99c0").unwrap()))
         .add_plugins(DefaultPlugins)
         .add_plugin(WorldInspectorPlugin::new())
-        .add_plugin(InspectorPlugin::<AppConfig>::new())
+        .add_plugin(InspectorPlugin::<BoidSettings>::new())
         .add_plugin(DebugLinesPlugin::default())
         .add_startup_system(setup)
         .add_system(update_boid_transforms)
@@ -88,14 +97,14 @@ fn setup(mut commands: Commands, asset_server: ResMut<AssetServer>) {
 }
 
 fn update_boid_transforms(
-    mut transforms: Query<&mut Transform, With<Bird>>,
+    mut boid_transforms: Query<&mut Transform, With<Bird>>,
     time: Res<Time>,
     windows: Res<Windows>,
     mut lines: ResMut<DebugLines>,
-    app_config: Res<AppConfig>,
+    app_config: Res<BoidSettings>,
 ) {
-    let boid_positions: Vec<Vec3> = transforms.iter().map(|t| t.translation).collect();
-    for mut transform in transforms.iter_mut() {
+    let boid_transforms_copy: Vec<Transform> = boid_transforms.iter().cloned().collect();
+    for mut transform in boid_transforms.iter_mut() {
         let mut turn_directions: Vec<f32> = Vec::new();
         let position = transform.translation;
 
@@ -125,42 +134,59 @@ fn update_boid_transforms(
         //     );
         // }
 
-        let cohesion_turn_factor = boid_cohesion(
-            &boid_positions,
-            &transform,
-            match app_config.debug_lines {
-                true => Some(&mut lines),
-                false => None,
-            },
-            app_config.boid_cohesion_distance,
-            app_config.boid_separation_distance,
-        );
+        if app_config.cohesion_enabled {
+            let cohesion_turn_factor = boid_cohesion(
+                &boid_transforms_copy,
+                &transform,
+                match app_config.debug_lines {
+                    true => Some(&mut lines),
+                    false => None,
+                },
+                app_config.cohesion_distance,
+                app_config.separation_distance,
+            );
 
-        if !cohesion_turn_factor.is_nan() {
-            turn_directions.push(cohesion_turn_factor);
+            if !cohesion_turn_factor.is_nan() {
+                turn_directions.push(cohesion_turn_factor);
+            }
         }
 
-        turn_directions.append(&mut boid_separation(
-            &transform,
-            app_config.boid_separation_distance,
-            &boid_positions,
-            match app_config.debug_lines {
-                true => Some(&mut lines),
-                false => None,
-            },
-        ));
+        if app_config.separation_enabled {
+            turn_directions.append(&mut boid_separation(
+                &transform,
+                app_config.separation_distance,
+                &boid_transforms_copy,
+                match app_config.debug_lines {
+                    true => Some(&mut lines),
+                    false => None,
+                },
+            ));
+        }
 
+        if app_config.alignment_enabled {
+            if let Some(direction) = boid_alignment(
+                &transform,
+                &boid_transforms_copy,
+                app_config.alignment_distance,
+                match app_config.debug_lines {
+                    true => Some(&mut lines),
+                    false => None,
+                },
+            ) {
+                turn_directions.push(direction);
+            }
+        }
         let final_turn_direction = match turn_directions.is_empty() {
             true => 0.0,
-            false => turn_directions.iter().sum::<f32>() / turn_directions.len() as f32,
+            false => turn_directions.into_iter().avg(),
         };
 
         // move forward
         let forward = transform.up();
         transform.rotate_z(
-            final_turn_direction * app_config.boid_max_turn_rate_per_second * time.delta_seconds(),
+            final_turn_direction * app_config.max_turn_rate_per_second * time.delta_seconds(),
         );
-        transform.translation += forward * time.delta_seconds() * app_config.boid_speed;
+        transform.translation += forward * time.delta_seconds() * app_config.speed;
 
         // Wrap around when a boid reaches the edge of the window
         let wnd = windows.get_primary().unwrap();
@@ -182,7 +208,7 @@ fn update_boid_transforms(
 }
 
 fn boid_cohesion(
-    boid_positions: &[Vec3],
+    boid_transforms: &[Transform],
     transform: &Transform,
     lines: Option<&mut ResMut<DebugLines>>,
     boid_cohesion_distance: f32,
@@ -190,24 +216,21 @@ fn boid_cohesion(
 ) -> f32 {
     // Move towards the average position of other boids
 
-    let boid_positions: Vec<Vec3> = boid_positions
+    let average_position_of_near_boids: Vec2 = boid_transforms
         .iter()
         .filter(|t| {
-            let distance = transform.translation.distance(**t);
+            let distance = transform.translation.distance(t.translation);
             distance < boid_cohesion_distance && distance > boid_separation_distance
         })
         // Exclude itself
-        .filter(|t| **t != transform.translation)
-        .cloned()
-        .collect();
-    let total: Vec3 = boid_positions.iter().sum();
+        .filter(|t| t.translation != transform.translation)
+        .map(|t| t.translation.truncate())
+        .avg();
 
-    let average_position_of_near_boids: Vec3 = total / (boid_positions.len() as f32);
+    let direction_to_target =
+        (average_position_of_near_boids - transform.translation.truncate()).normalize();
 
-    let direction_to_target = (average_position_of_near_boids - transform.translation)
-        .truncate()
-        .normalize();
-    let turn_direction_to_center_of_near = -transform.right().truncate().dot(direction_to_target);
+    let turn_direction_to_center_of_near = -how_much_right_or_left(transform, &direction_to_target);
     if let Some(lines) = lines {
         lines.line_gradient(
             transform.translation,
@@ -223,32 +246,21 @@ fn boid_cohesion(
 fn boid_separation(
     transform: &Transform,
     boid_separation_distance: f32,
-    boid_positions: &[Vec3],
+    boid_positions: &[Transform],
     mut lines: Option<&mut DebugLines>,
 ) -> Vec<f32> {
     let position = transform.translation;
-    let separation_boids: Vec<Vec3> = boid_positions
+    boid_positions
         .iter()
-        .filter(|t| t.distance(position) < boid_separation_distance)
-        .filter(|t| **t != position)
-        .cloned()
-        .collect();
-
-    separation_boids
-        .iter()
+        .filter(|t| t.translation.distance(position) < boid_separation_distance)
+        .filter(|t| t.translation != position)
         .map(|target| {
-            let direction_to_target = (*target - position).truncate().normalize();
-
-            // The dot product when used with normalized vectors tells you how parallel
-            // a vector is to another.
-            // Negative values means it is facing the opposite way,
-            // so if we use the right facing vector, the result will be -1.0 to 1.0 based on
-            // how much to the right the target is from the current boid.
-            let direction = transform.right().truncate().dot(direction_to_target);
+            let target = target.translation;
+            let direction = how_much_right_or_left(transform, &target.truncate());
             if let Some(lines) = &mut lines {
                 lines.line_gradient(
                     transform.translation,
-                    ((*target - transform.translation) * 0.5) + transform.translation,
+                    ((target - transform.translation) * 0.5) + transform.translation,
                     0.0,
                     Color::rgba(1.0, 0.0, 0.0, (direction + 1.0) / 2.0),
                     Color::rgba(1.0, 0.0, 0.0, 0.2),
@@ -257,4 +269,91 @@ fn boid_separation(
             direction
         })
         .collect()
+}
+
+fn boid_alignment(
+    transform: &Transform,
+    boid_transforms: &[Transform],
+    boid_alignment_distance: f32,
+    mut lines: Option<&mut DebugLines>,
+) -> Option<f32> {
+    let average: Vec2 = boid_transforms
+        .iter()
+        .filter(|t| {
+            t.translation
+                .truncate()
+                .distance_squared(transform.translation.truncate())
+                < boid_alignment_distance * boid_alignment_distance
+        })
+        .map(|t| t.up().truncate())
+        .avg()
+        .normalize();
+    match average.is_nan() {
+        true => None,
+        false => {
+            if let Some(lines) = &mut lines {
+                lines.line_colored(
+                    transform.translation,
+                    transform.translation + (average.extend(0.0) * 20.0),
+                    0.0,
+                    Color::VIOLET,
+                );
+            }
+            let p =
+                -how_much_right_or_left(&Transform::from_rotation(transform.rotation), &average);
+
+            Some(p)
+        }
+    }
+}
+
+fn how_much_right_or_left(transform: &Transform, target: &Vec2) -> f32 {
+    let direction_to_target = (*target - transform.translation.truncate()).normalize();
+
+    // The dot product when used with normalized vectors tells you how parallel
+    // a vector is to another.
+    // Negative values means it is facing the opposite way,
+    // so if we use the right facing vector, the result will be -1.0 to 1.0 based on
+    // how much to the right the target is from the current boid.
+    transform.right().truncate().dot(direction_to_target)
+}
+
+trait Average<A, B>
+where
+    Self: Iterator<Item = A>,
+{
+    fn avg(self) -> B;
+}
+
+impl<'a, I: Iterator<Item = &'a Vec2>> Average<&'a Vec2, Vec2> for I {
+    fn avg(self) -> Vec2 {
+        let mut count = 0;
+        let sum = self.fold(Vec2::default(), |a, b| {
+            count += 1;
+            a + *b
+        });
+        sum / count as f32
+    }
+}
+
+impl<I: Iterator<Item = Vec2>> Average<Vec2, Vec2> for I {
+    fn avg(self) -> Vec2 {
+        let mut count = 0;
+        let sum = self.fold(Vec2::default(), |a, b| {
+            count += 1;
+            a + b
+        });
+        sum / count as f32
+    }
+}
+
+impl<I: Iterator<Item = f32>> Average<f32, f32> for I {
+    fn avg(self) -> f32 {
+        let mut count = 0;
+        let sum = self.fold(f32::default(), |a, b| {
+            count += 1;
+            a + b
+        });
+        sum / count as f32
+    }
 }
