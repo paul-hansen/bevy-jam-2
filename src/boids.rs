@@ -31,9 +31,9 @@ impl Default for BoidSettings {
             alignment_enabled: true,
             speed: 80.0,
             max_turn_rate_per_second: PI * 2.8,
-            separation_distance: 15.0,
+            separation_distance: 10.0,
             cohesion_distance: 120.0,
-            alignment_distance: 73.0,
+            alignment_distance: 25.0,
             debug_lines: false,
         }
     }
