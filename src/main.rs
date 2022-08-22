@@ -1,11 +1,14 @@
 mod boids;
+mod camera;
 mod math;
 
 use crate::boids::{
     calculate_alignment_inputs, calculate_cohesion_inputs, calculate_separation_inputs,
-    update_boid_neighbors, update_boid_transforms, Boid, BoidNeighborsAlignment,
-    BoidNeighborsCohesion, BoidNeighborsSeparation, BoidSettings, BoidTurnDirectionInputs,
+    propagate_boid_color, update_boid_color, update_boid_neighbors, update_boid_transforms, Boid,
+    BoidColor, BoidNeighborsAlignment, BoidNeighborsCohesion, BoidNeighborsSeparation,
+    BoidSettings, BoidTurnDirectionInputs,
 };
+use crate::camera::{update_camera_follow_system, Camera2dFollow};
 use crate::math::how_much_right_or_left;
 use bevy::asset::AssetServerSettings;
 use bevy::prelude::*;
@@ -50,7 +53,10 @@ fn main() {
         CoreStage::PreUpdate,
         calculate_alignment_inputs.after(calculate_separation_inputs),
     )
-    .add_system_to_stage(CoreStage::Last, update_boid_transforms);
+    .add_system_to_stage(CoreStage::Last, update_boid_transforms)
+    .add_system(update_boid_color)
+    .add_system(update_camera_follow_system)
+    .add_system(propagate_boid_color);
 
     #[cfg(debug_assertions)]
     app.add_plugin(bevy_inspector_egui::WorldInspectorPlugin::new());
@@ -59,18 +65,9 @@ fn main() {
 }
 
 fn setup(mut commands: Commands, asset_server: ResMut<AssetServer>) {
-    commands.spawn_bundle(Camera2dBundle {
-        projection: OrthographicProjection {
-            scaling_mode: ScalingMode::FixedVertical(SCENE_HEIGHT),
-            ..Default::default()
-        },
-        ..Default::default()
-    });
-
     let rand = Rng::new();
-
     for x in 0..BOID_COUNT {
-        commands
+        let entity = commands
             .spawn_bundle(SpriteBundle {
                 texture: asset_server.load("bird.png"),
                 transform: Transform::from_xyz(
@@ -87,6 +84,23 @@ fn setup(mut commands: Commands, asset_server: ResMut<AssetServer>) {
             .insert(BoidNeighborsSeparation::default())
             .insert(BoidNeighborsCohesion::default())
             .insert(BoidTurnDirectionInputs::default())
-            .insert(Boid::default());
+            .insert(BoidColor::from_index(x))
+            .insert(Boid::default())
+            .id();
+
+        if x == 0 {
+            commands
+                .spawn_bundle(Camera2dBundle {
+                    projection: OrthographicProjection {
+                        scaling_mode: ScalingMode::FixedVertical(SCENE_HEIGHT),
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                })
+                .insert(Camera2dFollow {
+                    target: entity,
+                    offset: Default::default(),
+                });
+        }
     }
 }

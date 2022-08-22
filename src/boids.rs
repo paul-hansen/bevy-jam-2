@@ -1,9 +1,10 @@
-use crate::{how_much_right_or_left, Average, SCENE_HEIGHT};
+use crate::{how_much_right_or_left, Average};
 use bevy::prelude::*;
 use bevy_inspector_egui::egui::Ui;
 use bevy_inspector_egui::{Context, Inspectable};
 use bevy_prototype_debug_lines::DebugLines;
 use std::f32::consts::PI;
+use std::mem;
 
 #[derive(Inspectable, Debug)]
 pub struct BoidSettings {
@@ -164,10 +165,41 @@ pub fn update_boid_neighbors(
     }
 }
 
+#[derive(Component, Default, Eq, PartialEq, Copy, Clone, Debug)]
+pub enum BoidColor {
+    #[default]
+    None,
+    Red,
+    Green,
+    Blue,
+    Yellow,
+}
+
+impl BoidColor {
+    pub fn from_index(i: usize) -> Self {
+        match i {
+            0 => Self::Red,
+            1 => Self::Green,
+            2 => Self::Blue,
+            3 => Self::Yellow,
+            _ => Self::None,
+        }
+    }
+
+    pub fn color(&self) -> Color {
+        match self {
+            BoidColor::None => Color::WHITE,
+            BoidColor::Red => Color::RED,
+            BoidColor::Green => Color::GREEN,
+            BoidColor::Blue => Color::BLUE,
+            BoidColor::Yellow => Color::YELLOW,
+        }
+    }
+}
+
 pub fn update_boid_transforms(
     mut boid_query: Query<(&mut Transform, &mut BoidTurnDirectionInputs), With<Boid>>,
     time: Res<Time>,
-    windows: Res<Windows>,
     mut lines: ResMut<DebugLines>,
     boid_settings: Res<BoidSettings>,
 ) {
@@ -187,24 +219,6 @@ pub fn update_boid_transforms(
         );
         transform.translation += forward * time.delta_seconds() * boid_settings.speed;
         inputs.reset();
-
-        // Wrap around when a boid reaches the edge of the window
-        if let Some(wnd) = windows.get_primary() {
-            let scene_width = SCENE_HEIGHT * wnd.width() as f32 / wnd.height() as f32;
-            let scene_width_half = scene_width / 2.0;
-
-            if transform.translation.x.abs() > scene_width_half {
-                transform.translation.x =
-                    (transform.translation.x * -1.0).clamp(-scene_width_half, scene_width_half);
-            }
-
-            let scene_height_half = SCENE_HEIGHT / 2.0;
-
-            if transform.translation.y.abs() > scene_height_half {
-                transform.translation.y =
-                    (transform.translation.y * -1.0).clamp(-scene_height_half, scene_height_half);
-            }
-        }
     }
 }
 
@@ -326,6 +340,31 @@ pub fn calculate_alignment_inputs(
                 &Transform::from_rotation(transform.rotation),
                 &average,
             ));
+        }
+    }
+}
+
+pub fn update_boid_color(mut query: Query<(&mut Sprite, &BoidColor), Changed<BoidColor>>) {
+    for (mut sprite, color) in query.iter_mut() {
+        sprite.color = color.color();
+    }
+}
+
+pub fn propagate_boid_color(
+    mut query: Query<(Entity, &BoidNeighborsAlignment), With<BoidColor>>,
+    mut boid_colors: Query<&mut BoidColor>,
+) {
+    for (entity, neighbors) in query.iter_mut() {
+        if let Ok(color) = boid_colors.get(entity).cloned() {
+            if color != BoidColor::None {
+                // println!("{}", neighbors.entities.len());
+                let mut iter = boid_colors.iter_many_mut(&neighbors.entities);
+                while let Some(mut boid_color) = iter.fetch_next() {
+                    if *boid_color != color {
+                        let _ = mem::replace(&mut *boid_color, color);
+                    }
+                }
+            }
         }
     }
 }
