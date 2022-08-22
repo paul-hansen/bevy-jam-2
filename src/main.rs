@@ -21,6 +21,8 @@ use turborand::prelude::*;
 
 const SCENE_HEIGHT: f32 = 500.0;
 const BOID_COUNT: usize = 400;
+const ARENA_RADIUS: f32 = 1200.0;
+const ARENA_PADDING: f32 = 250.0;
 
 fn main() {
     let mut app = App::new();
@@ -84,7 +86,7 @@ fn setup(
                 transform: Transform::from_xyz(
                     (SCENE_HEIGHT / 2.0) * rand.f32_normalized(),
                     (SCENE_HEIGHT / 2.0) * rand.f32_normalized(),
-                    x as f32,
+                    5.0,
                 )
                 .with_rotation(Quat::from_rotation_z(rand.f32_normalized() * PI * 2.0))
                 .with_scale(Vec3::splat(0.01)),

@@ -1,4 +1,4 @@
-use crate::{how_much_right_or_left, Average};
+use crate::{how_much_right_or_left, Average, ARENA_PADDING, ARENA_RADIUS};
 use bevy::prelude::*;
 use bevy_inspector_egui::egui::Ui;
 use bevy_inspector_egui::{Context, Inspectable};
@@ -215,16 +215,11 @@ pub fn update_boid_transforms(
 
         let forward = transform.up();
 
-        if transform.translation.length() > 900.0 {
-            let r = (transform
-                .up()
-                .truncate()
-                .dot(transform.translation.truncate().normalize())
-                + 3.0)
-                * 0.1;
-            println!("test {r}");
-            inputs.add(r);
-        }
+        // The more into the arena padding the more it turns, making it turn around.
+        let r = ((transform.translation.length() - (ARENA_RADIUS - ARENA_PADDING)).max(0.0)
+            / ARENA_PADDING)
+            * 2.0;
+        inputs.add(r);
 
         transform.rotate_z(
             inputs.average() * boid_settings.max_turn_rate_per_second * time.delta_seconds(),
