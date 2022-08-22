@@ -97,12 +97,9 @@ impl BoidTurnDirectionInputs {
         if direction.is_nan() {
             error!("Tried to add nan to inputs");
         } else {
-            if self.count == 0 {
-                self.average = direction;
-            } else {
-                self.average = self.average + ((direction - self.average) / self.count as f32);
-            }
             self.count += 1;
+            self.average =
+                ((self.average * (self.count - 1) as f32) + direction) / self.count as f32;
         }
     }
 
@@ -219,8 +216,9 @@ pub fn update_boid_transforms(
         let r = ((transform.translation.length() - (ARENA_RADIUS - ARENA_PADDING)).max(0.0)
             / ARENA_PADDING)
             * 2.0;
-        inputs.add(r);
-
+        if r.abs() > 0.0 {
+            inputs.add(r);
+        }
         transform.rotate_z(
             inputs.average() * boid_settings.max_turn_rate_per_second * time.delta_seconds(),
         );
