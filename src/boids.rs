@@ -214,6 +214,18 @@ pub fn update_boid_transforms(
         }
 
         let forward = transform.up();
+
+        if transform.translation.length() > 900.0 {
+            let r = (transform
+                .up()
+                .truncate()
+                .dot(transform.translation.truncate().normalize())
+                + 3.0)
+                * 0.1;
+            println!("test {r}");
+            inputs.add(r);
+        }
+
         transform.rotate_z(
             inputs.average() * boid_settings.max_turn_rate_per_second * time.delta_seconds(),
         );

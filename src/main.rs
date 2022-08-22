@@ -34,7 +34,7 @@ fn main() {
         ..default()
     })
     .insert_resource(BoidSettings::default())
-    .insert_resource(ClearColor(Color::hex("6c99c0").unwrap()))
+    .insert_resource(ClearColor(Color::BLACK))
     .add_plugins(DefaultPlugins)
     .add_plugin(InspectorPlugin::<BoidSettings>::new())
     .add_plugin(DebugLinesPlugin::default())
@@ -64,7 +64,18 @@ fn main() {
     app.run();
 }
 
-fn setup(mut commands: Commands, asset_server: ResMut<AssetServer>) {
+fn setup(
+    mut commands: Commands,
+    asset_server: ResMut<AssetServer>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<ColorMaterial>>,
+) {
+    commands.spawn_bundle(ColorMesh2dBundle {
+        mesh: meshes.add(Mesh::from(shape::Circle::new(1000.0))).into(),
+        material: materials.add(ColorMaterial::from(Color::hex("6c99c0").unwrap())),
+        ..default()
+    });
+
     let rand = Rng::new();
     for x in 0..BOID_COUNT {
         let entity = commands
