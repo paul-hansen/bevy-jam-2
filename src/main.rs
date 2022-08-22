@@ -43,6 +43,7 @@ fn main() {
     .register_inspectable::<BoidNeighborsAlignment>()
     .register_inspectable::<BoidNeighborsCohesion>()
     .register_inspectable::<BoidNeighborsSeparation>()
+    .register_inspectable::<Camera2dFollow>()
     .register_type::<BoidTurnDirectionInputs>()
     .add_startup_system(setup)
     .add_system_to_stage(CoreStage::First, update_boid_neighbors)

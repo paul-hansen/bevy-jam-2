@@ -1,6 +1,7 @@
 use crate::{Camera2d, Query};
 use bevy::math::Vec2Swizzles;
 use bevy::prelude::*;
+use bevy_inspector_egui::Inspectable;
 
 pub fn update_camera_follow_system(
     mut cameras: Query<(&Camera2dFollow, &mut Transform), With<Camera2d>>,
@@ -16,7 +17,7 @@ pub fn update_camera_follow_system(
     }
 }
 
-#[derive(Component)]
+#[derive(Component, Inspectable)]
 pub struct Camera2dFollow {
     pub target: Entity,
     pub offset: Vec2,
