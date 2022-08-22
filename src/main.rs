@@ -15,6 +15,7 @@ use bevy::prelude::*;
 use bevy::render::camera::ScalingMode;
 use bevy_inspector_egui::{InspectorPlugin, RegisterInspectable};
 use bevy_prototype_debug_lines::DebugLinesPlugin;
+use leafwing_input_manager::prelude::*;
 use math::Average;
 use std::f32::consts::PI;
 use turborand::prelude::*;
@@ -40,6 +41,7 @@ fn main() {
     .add_plugins(DefaultPlugins)
     .add_plugin(InspectorPlugin::<BoidSettings>::new())
     .add_plugin(DebugLinesPlugin::default())
+    .add_plugin(InputManagerPlugin::<Actions>::default())
     .register_inspectable::<BoidNeighborsAlignment>()
     .register_inspectable::<BoidNeighborsCohesion>()
     .register_inspectable::<BoidNeighborsSeparation>()
@@ -65,6 +67,11 @@ fn main() {
     app.add_plugin(bevy_inspector_egui::WorldInspectorPlugin::new());
 
     app.run();
+}
+
+#[derive(Actionlike, PartialEq, Eq, Clone, Copy, Hash, Debug)]
+pub enum Actions {
+    Move,
 }
 
 fn setup(
@@ -97,6 +104,7 @@ fn setup(
             .insert(BoidNeighborsAlignment::default())
             .insert(BoidNeighborsSeparation::default())
             .insert(BoidNeighborsCohesion::default())
+            .insert(ActionState::<Actions>::default())
             .insert(BoidTurnDirectionInputs::default())
             .insert(BoidColor::from_index(x))
             .insert(Boid::default())
@@ -115,6 +123,13 @@ fn setup(
                     target: entity,
                     offset: Default::default(),
                 });
+            commands.entity(entity).insert(
+                InputMap::<Actions>::default()
+                    .insert(VirtualDPad::wasd(), Actions::Move)
+                    .insert(VirtualDPad::arrow_keys(), Actions::Move)
+                    .insert(DualAxis::left_stick(), Actions::Move)
+                    .build(),
+            );
         }
     }
 }

@@ -11,6 +11,7 @@ bevy = "0.8.0"
 turborand = "0.6.0"
 bevy-inspector-egui = "0.12.1"
 bevy_prototype_debug_lines = "0.8.1"
+leafwing-input-manager = "0.5.2"
 
 [profile.dev]
 opt-level = 1

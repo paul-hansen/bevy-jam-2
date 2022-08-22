@@ -1,8 +1,12 @@
-use crate::{how_much_right_or_left, Average, ARENA_PADDING, ARENA_RADIUS};
+use crate::{how_much_right_or_left, Actions, Average, ARENA_PADDING, ARENA_RADIUS};
 use bevy::prelude::*;
 use bevy_inspector_egui::egui::Ui;
 use bevy_inspector_egui::{Context, Inspectable};
 use bevy_prototype_debug_lines::DebugLines;
+use leafwing_input_manager::action_state::ActionData;
+use leafwing_input_manager::axislike::DualAxisData;
+use leafwing_input_manager::buttonlike::ButtonState;
+use leafwing_input_manager::prelude::*;
 use std::f32::consts::PI;
 use std::mem;
 
@@ -34,7 +38,7 @@ impl Default for BoidSettings {
             max_turn_rate_per_second: PI * 2.8,
             separation_distance: 10.0,
             cohesion_distance: 120.0,
-            alignment_distance: 25.0,
+            alignment_distance: 35.0,
             debug_lines: false,
         }
     }
@@ -195,12 +199,19 @@ impl BoidColor {
 }
 
 pub fn update_boid_transforms(
-    mut boid_query: Query<(&mut Transform, &mut BoidTurnDirectionInputs), With<Boid>>,
+    mut boid_query: Query<
+        (
+            &mut Transform,
+            &mut ActionState<Actions>,
+            &mut BoidTurnDirectionInputs,
+        ),
+        With<Boid>,
+    >,
     time: Res<Time>,
     mut lines: ResMut<DebugLines>,
     boid_settings: Res<BoidSettings>,
 ) {
-    for (mut transform, mut inputs) in boid_query.iter_mut() {
+    for (mut transform, mut action_state, mut inputs) in boid_query.iter_mut() {
         if boid_settings.debug_lines {
             lines.line_colored(
                 transform.translation,
@@ -219,14 +230,27 @@ pub fn update_boid_transforms(
         if r.abs() > 0.0 {
             inputs.add(r);
         }
-        transform.rotate_z(
-            inputs.average() * boid_settings.max_turn_rate_per_second * time.delta_seconds(),
+        add_axis_input(
+            &mut action_state,
+            Actions::Move,
+            DualAxisData::new(-inputs.average(), 0.0),
         );
-        transform.translation += forward * time.delta_seconds() * boid_settings.speed;
         inputs.reset();
+        let mut speed_multiplier = 1.0;
+        if let Some(axis_data) = action_state.clamped_axis_pair(Actions::Move) {
+            transform.rotate_z(
+                -axis_data.x() * boid_settings.max_turn_rate_per_second * time.delta_seconds(),
+            );
+            speed_multiplier += axis_data.y();
+        }
+
+        transform.translation +=
+            forward * time.delta_seconds() * boid_settings.speed * speed_multiplier;
+        action_state.set_action_data(Actions::Move, ActionData::default());
     }
 }
 
+#[allow(clippy::type_complexity)]
 pub fn calculate_cohesion_inputs(
     mut query: Query<
         (
@@ -234,7 +258,7 @@ pub fn calculate_cohesion_inputs(
             &BoidNeighborsCohesion,
             &mut BoidTurnDirectionInputs,
         ),
-        With<Boid>,
+        (With<Boid>, Without<InputMap<Actions>>),
     >,
     transforms: Query<&Transform>,
     mut lines: ResMut<DebugLines>,
@@ -274,6 +298,7 @@ pub fn calculate_cohesion_inputs(
     }
 }
 
+#[allow(clippy::type_complexity)]
 pub fn calculate_separation_inputs(
     mut query: Query<
         (
@@ -281,7 +306,7 @@ pub fn calculate_separation_inputs(
             &BoidNeighborsSeparation,
             &mut BoidTurnDirectionInputs,
         ),
-        With<Boid>,
+        (With<Boid>, Without<InputMap<Actions>>),
     >,
     transforms: Query<&Transform>,
     mut lines: ResMut<DebugLines>,
@@ -310,6 +335,7 @@ pub fn calculate_separation_inputs(
     }
 }
 
+#[allow(clippy::type_complexity)]
 pub fn calculate_alignment_inputs(
     mut query: Query<
         (
@@ -317,7 +343,7 @@ pub fn calculate_alignment_inputs(
             &BoidNeighborsAlignment,
             &mut BoidTurnDirectionInputs,
         ),
-        With<Boid>,
+        (With<Boid>, Without<InputMap<Actions>>),
     >,
     transforms: Query<&Transform>,
     mut lines: ResMut<DebugLines>,
@@ -372,4 +398,18 @@ pub fn propagate_boid_color(
             }
         }
     }
+}
+
+fn add_axis_input(
+    action_state: &mut ActionState<Actions>,
+    action: Actions,
+    axis_data: DualAxisData,
+) {
+    let mut data = action_state.action_data(action);
+    data.value += axis_data.x();
+    data.axis_pair = Some(
+        data.axis_pair
+            .map_or(axis_data, |u| u.merged_with(axis_data)),
+    );
+    action_state.set_action_data(action, data);
 }
