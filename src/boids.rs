@@ -6,6 +6,7 @@ use bevy_prototype_debug_lines::DebugLines;
 use leafwing_input_manager::action_state::ActionData;
 use leafwing_input_manager::axislike::DualAxisData;
 use leafwing_input_manager::prelude::*;
+use std::collections::HashMap;
 use std::f32::consts::PI;
 use std::mem;
 
@@ -165,10 +166,8 @@ pub fn update_boid_neighbors(
     }
 }
 
-#[derive(Component, Default, Eq, PartialEq, Copy, Clone, Debug)]
+#[derive(Component, Eq, PartialEq, Copy, Clone, Debug, Hash)]
 pub enum BoidColor {
-    #[default]
-    None,
     Red,
     Green,
     Blue,
@@ -176,19 +175,18 @@ pub enum BoidColor {
 }
 
 impl BoidColor {
-    pub fn from_index(i: usize) -> Self {
+    pub fn from_index(i: usize) -> Option<Self> {
         match i {
-            0 => Self::Red,
-            1 => Self::Green,
-            2 => Self::Blue,
-            3 => Self::Yellow,
-            _ => Self::None,
+            0 => Some(Self::Red),
+            1 => Some(Self::Green),
+            2 => Some(Self::Blue),
+            3 => Some(Self::Yellow),
+            _ => None,
         }
     }
 
     pub fn color(&self) -> Color {
         match self {
-            BoidColor::None => Color::WHITE,
             BoidColor::Red => Color::RED,
             BoidColor::Green => Color::GREEN,
             BoidColor::Blue => Color::BLUE,
@@ -381,19 +379,27 @@ pub fn update_boid_color(mut query: Query<(&mut Sprite, &BoidColor), Changed<Boi
 }
 
 pub fn propagate_boid_color(
-    mut query: Query<(Entity, &BoidNeighborsAlignment), With<BoidColor>>,
+    mut commands: Commands,
+    mut query: Query<(Entity, &BoidNeighborsAlignment), With<Boid>>,
     mut boid_colors: Query<&mut BoidColor>,
 ) {
     for (entity, neighbors) in query.iter_mut() {
-        if let Ok(color) = boid_colors.get(entity).cloned() {
-            if color != BoidColor::None {
-                // println!("{}", neighbors.entities.len());
-                let mut iter = boid_colors.iter_many_mut(&neighbors.entities);
-                while let Some(mut boid_color) = iter.fetch_next() {
-                    if *boid_color != color {
-                        let _ = mem::replace(&mut *boid_color, color);
-                    }
+        let mut neighbor_color_counts: HashMap<BoidColor, usize> = HashMap::new();
+        for other_color in boid_colors.iter_many(&neighbors.entities) {
+            let count = neighbor_color_counts.entry(*other_color).or_insert(0);
+            *count += 1;
+        }
+        let dominate_color = neighbor_color_counts
+            .into_iter()
+            .max_by_key(|(_, c)| *c)
+            .map(|(c, _)| c);
+        if let Some(dominate_color) = dominate_color {
+            if let Ok(mut our_color) = boid_colors.get_mut(entity) {
+                if *our_color != dominate_color {
+                    let _ = mem::replace(&mut *our_color, dominate_color);
                 }
+            } else {
+                commands.entity(entity).insert(dominate_color);
             }
         }
     }

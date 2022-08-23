@@ -104,9 +104,12 @@ fn setup(
             .insert(BoidNeighborsCohesion::default())
             .insert(ActionState::<Actions>::default())
             .insert(BoidTurnDirectionInputs::default())
-            .insert(BoidColor::from_index(x))
             .insert(Boid::default())
             .id();
+
+        if let Some(color) = BoidColor::from_index(x) {
+            commands.entity(entity).insert(color);
+        }
 
         if x == 0 {
             commands
