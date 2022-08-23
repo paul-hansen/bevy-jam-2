@@ -22,7 +22,7 @@ use turborand::prelude::*;
 const SCENE_HEIGHT: f32 = 500.0;
 const BOID_COUNT: usize = 400;
 const ARENA_RADIUS: f32 = 1200.0;
-const ARENA_PADDING: f32 = 250.0;
+const ARENA_PADDING: f32 = 70.0;
 const BOID_SCALE: Vec3 = Vec3::splat(0.01);
 const LEADER_SCALE: Vec3 = Vec3::splat(0.014);
 
@@ -84,7 +84,9 @@ fn setup(
     mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
     commands.spawn_bundle(ColorMesh2dBundle {
-        mesh: meshes.add(Mesh::from(shape::Circle::new(1000.0))).into(),
+        mesh: meshes
+            .add(Mesh::from(shape::Circle::new(ARENA_RADIUS)))
+            .into(),
         material: materials.add(ColorMaterial::from(Color::hex("6c99c0").unwrap())),
         ..default()
     });

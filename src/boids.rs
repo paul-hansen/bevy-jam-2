@@ -5,9 +5,10 @@ use bevy_inspector_egui::{Context, Inspectable};
 use bevy_prototype_debug_lines::DebugLines;
 use leafwing_input_manager::action_state::ActionData;
 use leafwing_input_manager::axislike::DualAxisData;
+use leafwing_input_manager::orientation::{Orientation, Rotation};
 use leafwing_input_manager::prelude::*;
 use std::collections::HashMap;
-use std::f32::consts::PI;
+use std::f32::consts::{FRAC_PI_2, PI};
 use std::mem;
 
 #[derive(Inspectable, Debug)]
@@ -194,30 +195,37 @@ pub fn update_boid_transforms(
         }
 
         let forward = transform.up();
-
-        // The more into the arena padding the more it turns, making it turn around.
-        let r = ((transform.translation.length() - (ARENA_RADIUS - ARENA_PADDING)).max(0.0)
-            / ARENA_PADDING)
-            * 2.0;
-        if r.abs() > 0.0 {
-            inputs.add(r);
-        }
-        add_axis_input(
-            &mut action_state,
-            Actions::Move,
-            DualAxisData::new(-inputs.average(), 0.0),
-        );
-        inputs.reset();
         let mut speed_multiplier = 1.0;
-        if let Some(axis_data) = action_state.clamped_axis_pair(Actions::Move) {
-            transform.rotate_z(
-                -axis_data.x() * boid_settings.max_turn_rate_per_second * time.delta_seconds(),
+
+        // if headed out of bounds, rotate towards the center
+        let direction = -transform.translation.truncate();
+        if direction.length_squared() > (ARENA_RADIUS - ARENA_PADDING).powf(2.) {
+            let angle = direction.y.atan2(direction.x) - FRAC_PI_2;
+
+            transform.rotation.rotate_towards(
+                Quat::from_axis_angle(Vec3::Z, angle),
+                Some(Rotation::from_radians(FRAC_PI_2 * time.delta_seconds())),
             );
-            speed_multiplier += axis_data.y();
+        } else {
+            add_axis_input(
+                &mut action_state,
+                Actions::Move,
+                DualAxisData::new(-inputs.average(), 0.0),
+            );
+
+            if let Some(axis_data) = action_state.clamped_axis_pair(Actions::Move) {
+                transform.rotate_z(
+                    -axis_data.x() * boid_settings.max_turn_rate_per_second * time.delta_seconds(),
+                );
+                speed_multiplier += axis_data.y();
+            }
         }
 
         transform.translation +=
             forward * time.delta_seconds() * boid_settings.speed * speed_multiplier;
+
+        inputs.reset();
+
         action_state.set_action_data(Actions::Move, ActionData::default());
     }
 }
