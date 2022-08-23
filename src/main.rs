@@ -88,16 +88,14 @@ fn setup(
 
     let rand = Rng::new();
     for x in 0..BOID_COUNT {
+        let r = (ARENA_RADIUS - ARENA_PADDING) * rand.f32();
+        let theta = rand.f32() * 2.0 * PI;
         let entity = commands
             .spawn_bundle(SpriteBundle {
                 texture: asset_server.load("bird.png"),
-                transform: Transform::from_xyz(
-                    (SCENE_HEIGHT / 2.0) * rand.f32_normalized(),
-                    (SCENE_HEIGHT / 2.0) * rand.f32_normalized(),
-                    5.0,
-                )
-                .with_rotation(Quat::from_rotation_z(rand.f32_normalized() * PI * 2.0))
-                .with_scale(Vec3::splat(0.01)),
+                transform: Transform::from_xyz(r * theta.cos(), r * theta.sin(), 5.0)
+                    .with_rotation(Quat::from_rotation_z(rand.f32_normalized() * PI * 2.0))
+                    .with_scale(Vec3::splat(0.01)),
                 ..Default::default()
             })
             .insert(Name::new(format!("Boid {x}")))
