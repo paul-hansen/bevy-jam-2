@@ -1,4 +1,4 @@
-use crate::{how_much_right_or_left, Actions, Average, ARENA_PADDING, ARENA_RADIUS};
+use crate::{how_much_right_or_left, Actions, ARENA_PADDING, ARENA_RADIUS};
 use bevy::prelude::*;
 use bevy_inspector_egui::egui::Ui;
 use bevy_inspector_egui::{Context, Inspectable};
@@ -22,9 +22,7 @@ pub struct BoidSettings {
     #[inspectable(min = 0.0, max = 1000.0)]
     separation_distance: f32,
     #[inspectable(min = 0.0, max = 1000.0)]
-    cohesion_distance: f32,
-    #[inspectable(min = 0.0, max = 1000.0)]
-    alignment_distance: f32,
+    capture_range: f32,
     debug_lines: bool,
 }
 
@@ -36,9 +34,8 @@ impl Default for BoidSettings {
             alignment_enabled: true,
             speed: 80.0,
             max_turn_rate_per_second: PI * 2.8,
-            separation_distance: 10.0,
-            cohesion_distance: 120.0,
-            alignment_distance: 35.0,
+            separation_distance: 15.0,
+            capture_range: 20.0,
             debug_lines: false,
         }
     }
@@ -48,25 +45,11 @@ impl Default for BoidSettings {
 pub struct Boid {}
 
 #[derive(Component, Default)]
-pub struct BoidNeighborsCohesion {
+pub struct BoidNeighborsCaptureRange {
     entities: Vec<Entity>,
 }
 
-impl Inspectable for BoidNeighborsCohesion {
-    type Attributes = ();
-
-    fn ui(&mut self, ui: &mut Ui, _: Self::Attributes, _: &mut Context) -> bool {
-        ui.label(format!("{}", self.entities.len()));
-        false
-    }
-}
-
-#[derive(Component, Default, Reflect)]
-pub struct BoidNeighborsAlignment {
-    entities: Vec<Entity>,
-}
-
-impl Inspectable for BoidNeighborsAlignment {
+impl Inspectable for BoidNeighborsCaptureRange {
     type Attributes = ();
 
     fn ui(&mut self, ui: &mut Ui, _: Self::Attributes, _: &mut Context) -> bool {
@@ -118,13 +101,16 @@ impl BoidTurnDirectionInputs {
     }
 }
 
+#[derive(Component, Debug)]
+pub struct Leader;
+
+#[allow(clippy::type_complexity)]
 pub fn update_boid_neighbors(
     mut query: Query<
         (
             Entity,
             &Transform,
-            &mut BoidNeighborsAlignment,
-            &mut BoidNeighborsCohesion,
+            &mut BoidNeighborsCaptureRange,
             &mut BoidNeighborsSeparation,
         ),
         With<Boid>,
@@ -133,17 +119,9 @@ pub fn update_boid_neighbors(
 ) {
     let positions: Vec<(Entity, Vec3)> = query
         .iter()
-        .map(|(entity, transform, _, _, _)| (entity, transform.translation))
+        .map(|(entity, transform, _, _)| (entity, transform.translation))
         .collect();
-    for (
-        entity,
-        transform,
-        mut alignment_neighbors,
-        mut cohesion_neighbors,
-        mut separation_neighbors,
-    ) in query.iter_mut()
-    {
-        let mut a = Vec::new();
+    for (entity, transform, mut cohesion_neighbors, mut separation_neighbors) in query.iter_mut() {
         let mut c = Vec::new();
         let mut s = Vec::new();
         for (target, position) in positions.iter().filter(|(t, _)| t.id() != entity.id()) {
@@ -151,16 +129,13 @@ pub fn update_boid_neighbors(
                 .translation
                 .truncate()
                 .distance(position.truncate());
-            if distance < boid_settings.alignment_distance {
-                a.push(*target);
-            }
             if distance < boid_settings.separation_distance {
                 s.push(*target)
-            } else if distance < boid_settings.cohesion_distance {
+            }
+            if distance < boid_settings.capture_range {
                 c.push(*target);
             }
         }
-        alignment_neighbors.entities = a;
         cohesion_neighbors.entities = c;
         separation_neighbors.entities = s;
     }
@@ -250,14 +225,10 @@ pub fn update_boid_transforms(
 #[allow(clippy::type_complexity)]
 pub fn calculate_cohesion_inputs(
     mut query: Query<
-        (
-            &Transform,
-            &BoidNeighborsCohesion,
-            &mut BoidTurnDirectionInputs,
-        ),
-        (With<Boid>, Without<InputMap<Actions>>, With<BoidColor>),
+        (&Transform, &mut BoidTurnDirectionInputs, &BoidColor),
+        (With<Boid>, Without<InputMap<Actions>>),
     >,
-    transforms: Query<&Transform>,
+    leader_query: Query<(&Transform, &BoidColor), With<Leader>>,
     mut lines: ResMut<DebugLines>,
     boid_settings: Res<BoidSettings>,
 ) {
@@ -265,33 +236,32 @@ pub fn calculate_cohesion_inputs(
         return;
     }
     // Rotate towards the average position of other boids within cohesion range.
-    for (transform, neighbors, mut inputs) in query.iter_mut() {
-        let average_position_of_near_boids: Vec2 = transforms
-            .iter_many(&neighbors.entities)
-            .map(|t| t.translation.truncate())
-            .avg();
-        if average_position_of_near_boids.is_nan() {
-            // There were no neighbors so it divided by zero when averaging.
-            // We don't need to add any inputs if it has no neighbors so we move on..
-            continue;
-        }
-        let direction_to_target =
-            (average_position_of_near_boids - transform.translation.truncate()).normalize();
+    for (transform, mut inputs, color) in query.iter_mut() {
+        if let Some((leader_transform, _)) = leader_query.iter().find(|(_, c)| *c == color) {
+            let average_position_of_near_boids = leader_transform.translation.truncate();
+            if average_position_of_near_boids.is_nan() {
+                // There were no neighbors so it divided by zero when averaging.
+                // We don't need to add any inputs if it has no neighbors so we move on..
+                continue;
+            }
+            let direction_to_target =
+                (average_position_of_near_boids - transform.translation.truncate()).normalize();
 
-        let turn_direction_to_center_of_near = -how_much_right_or_left(
-            transform,
-            &(transform.translation.truncate() + direction_to_target),
-        );
-        if boid_settings.debug_lines {
-            lines.line_gradient(
-                transform.translation,
-                (direction_to_target.extend(0.0) * 20.0) + transform.translation,
-                0.0,
-                Color::rgba(0.2, 1.0, 0.2, 1.0),
-                Color::rgba(0.2, 1.0, 0.2, 0.0),
+            let turn_direction_to_center_of_near = -how_much_right_or_left(
+                transform,
+                &(transform.translation.truncate() + direction_to_target),
             );
+            if boid_settings.debug_lines {
+                lines.line_gradient(
+                    transform.translation,
+                    (direction_to_target.extend(0.0) * 20.0) + transform.translation,
+                    0.0,
+                    Color::rgba(0.2, 1.0, 0.2, 1.0),
+                    Color::rgba(0.2, 1.0, 0.2, 0.0),
+                );
+            }
+            inputs.add(turn_direction_to_center_of_near);
         }
-        inputs.add(turn_direction_to_center_of_near);
     }
 }
 
@@ -335,27 +305,19 @@ pub fn calculate_separation_inputs(
 #[allow(clippy::type_complexity)]
 pub fn calculate_alignment_inputs(
     mut query: Query<
-        (
-            &Transform,
-            &BoidNeighborsAlignment,
-            &mut BoidTurnDirectionInputs,
-        ),
-        (With<Boid>, Without<InputMap<Actions>>, With<BoidColor>),
+        (&Transform, &mut BoidTurnDirectionInputs, &BoidColor),
+        (With<Boid>, Without<InputMap<Actions>>),
     >,
-    transforms: Query<&Transform>,
+    leader_query: Query<(&Transform, &BoidColor), With<Leader>>,
     mut lines: ResMut<DebugLines>,
     boid_settings: Res<BoidSettings>,
 ) {
     if !boid_settings.alignment_enabled {
         return;
     }
-    for (transform, neighbors, mut inputs) in query.iter_mut() {
-        let average: Vec2 = transforms
-            .iter_many(&neighbors.entities)
-            .map(|t| t.up().truncate())
-            .avg()
-            .normalize();
-        if !average.is_nan() {
+    for (transform, mut inputs, color) in query.iter_mut() {
+        if let Some((leader_transform, _)) = leader_query.iter().find(|(_, c)| *c == color) {
+            let average = leader_transform.up().truncate();
             if boid_settings.debug_lines {
                 lines.line_colored(
                     transform.translation,
@@ -380,7 +342,7 @@ pub fn update_boid_color(mut query: Query<(&mut Sprite, &BoidColor), Changed<Boi
 
 pub fn propagate_boid_color(
     mut commands: Commands,
-    mut query: Query<(Entity, &BoidNeighborsAlignment), With<Boid>>,
+    mut query: Query<(Entity, &BoidNeighborsCaptureRange), With<Boid>>,
     mut boid_colors: Query<&mut BoidColor>,
 ) {
     for (entity, neighbors) in query.iter_mut() {
@@ -397,6 +359,9 @@ pub fn propagate_boid_color(
             if let Ok(mut our_color) = boid_colors.get_mut(entity) {
                 if *our_color != dominate_color {
                     let _ = mem::replace(&mut *our_color, dominate_color);
+                    // There can be only one leader!
+                    commands.entity(entity).remove::<Leader>();
+                    commands.entity(entity).remove::<InputMap<Actions>>();
                 }
             } else {
                 commands.entity(entity).insert(dominate_color);

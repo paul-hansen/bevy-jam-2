@@ -5,8 +5,8 @@ mod math;
 use crate::boids::{
     calculate_alignment_inputs, calculate_cohesion_inputs, calculate_separation_inputs,
     propagate_boid_color, update_boid_color, update_boid_neighbors, update_boid_transforms, Boid,
-    BoidColor, BoidNeighborsAlignment, BoidNeighborsCohesion, BoidNeighborsSeparation,
-    BoidSettings, BoidTurnDirectionInputs,
+    BoidColor, BoidNeighborsCaptureRange, BoidNeighborsSeparation, BoidSettings,
+    BoidTurnDirectionInputs, Leader,
 };
 use crate::camera::{update_camera_follow_system, Camera2dFollow};
 use crate::math::how_much_right_or_left;
@@ -42,8 +42,7 @@ fn main() {
     .add_plugin(InspectorPlugin::<BoidSettings>::new())
     .add_plugin(DebugLinesPlugin::default())
     .add_plugin(InputManagerPlugin::<Actions>::default())
-    .register_inspectable::<BoidNeighborsAlignment>()
-    .register_inspectable::<BoidNeighborsCohesion>()
+    .register_inspectable::<BoidNeighborsCaptureRange>()
     .register_inspectable::<BoidNeighborsSeparation>()
     .register_inspectable::<Camera2dFollow>()
     .register_type::<BoidTurnDirectionInputs>()
@@ -99,16 +98,15 @@ fn setup(
                 ..Default::default()
             })
             .insert(Name::new(format!("Boid {x}")))
-            .insert(BoidNeighborsAlignment::default())
             .insert(BoidNeighborsSeparation::default())
-            .insert(BoidNeighborsCohesion::default())
+            .insert(BoidNeighborsCaptureRange::default())
             .insert(ActionState::<Actions>::default())
             .insert(BoidTurnDirectionInputs::default())
             .insert(Boid::default())
             .id();
 
         if let Some(color) = BoidColor::from_index(x) {
-            commands.entity(entity).insert(color);
+            commands.entity(entity).insert(color).insert(Leader);
         }
 
         if x == 0 {
