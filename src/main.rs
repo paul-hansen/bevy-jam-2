@@ -4,9 +4,9 @@ mod math;
 
 use crate::boids::{
     calculate_alignment_inputs, calculate_cohesion_inputs, calculate_separation_inputs,
-    propagate_boid_color, update_boid_color, update_boid_neighbors, update_boid_transforms, Boid,
-    BoidColor, BoidNeighborsCaptureRange, BoidNeighborsSeparation, BoidSettings,
-    BoidTurnDirectionInputs, Leader,
+    leader_removed, propagate_boid_color, update_boid_color, update_boid_neighbors,
+    update_boid_transforms, Boid, BoidColor, BoidNeighborsCaptureRange, BoidNeighborsSeparation,
+    BoidSettings, BoidTurnDirectionInputs, Leader,
 };
 use crate::camera::{update_camera_follow_system, Camera2dFollow};
 use crate::math::how_much_right_or_left;
@@ -24,6 +24,8 @@ const SCENE_HEIGHT: f32 = 500.0;
 const BOID_COUNT: usize = 400;
 const ARENA_RADIUS: f32 = 1200.0;
 const ARENA_PADDING: f32 = 250.0;
+const BOID_SCALE: Vec3 = Vec3::splat(0.01);
+const LEADER_SCALE: Vec3 = Vec3::splat(0.014);
 
 fn main() {
     let mut app = App::new();
@@ -60,7 +62,8 @@ fn main() {
     .add_system_to_stage(CoreStage::Last, update_boid_transforms)
     .add_system(update_boid_color)
     .add_system(update_camera_follow_system)
-    .add_system(propagate_boid_color);
+    .add_system_to_stage(CoreStage::PreUpdate, propagate_boid_color)
+    .add_system_to_stage(CoreStage::PostUpdate, leader_removed);
 
     #[cfg(debug_assertions)]
     app.add_plugin(bevy_inspector_egui::WorldInspectorPlugin::new());
@@ -94,7 +97,10 @@ fn setup(
                 texture: asset_server.load("bird.png"),
                 transform: Transform::from_xyz(r * theta.cos(), r * theta.sin(), 5.0)
                     .with_rotation(Quat::from_rotation_z(rand.f32_normalized() * PI * 2.0))
-                    .with_scale(Vec3::splat(0.01)),
+                    .with_scale(match x {
+                        x if x < 4 => LEADER_SCALE,
+                        _ => BOID_SCALE,
+                    }),
                 ..Default::default()
             })
             .insert(Name::new(format!("Boid {x}")))

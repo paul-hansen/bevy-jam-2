@@ -1,4 +1,4 @@
-use crate::{how_much_right_or_left, Actions, ARENA_PADDING, ARENA_RADIUS};
+use crate::{how_much_right_or_left, Actions, ARENA_PADDING, ARENA_RADIUS, BOID_SCALE};
 use bevy::prelude::*;
 use bevy_inspector_egui::egui::Ui;
 use bevy_inspector_egui::{Context, Inspectable};
@@ -366,6 +366,14 @@ pub fn propagate_boid_color(
             } else {
                 commands.entity(entity).insert(dominate_color);
             }
+        }
+    }
+}
+
+pub fn leader_removed(removals: RemovedComponents<Leader>, mut query: Query<&mut Transform>) {
+    for entity in removals.iter() {
+        if let Ok(mut transform) = query.get_mut(entity) {
+            transform.scale = BOID_SCALE;
         }
     }
 }
