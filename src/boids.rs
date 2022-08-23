@@ -121,7 +121,7 @@ pub fn update_boid_neighbors(
         .iter()
         .map(|(entity, transform, _, _)| (entity, transform.translation))
         .collect();
-    for (entity, transform, mut cohesion_neighbors, mut separation_neighbors) in query.iter_mut() {
+    for (entity, transform, mut capture_neighbors, mut separation_neighbors) in query.iter_mut() {
         let mut c = Vec::new();
         let mut s = Vec::new();
         for (target, position) in positions.iter().filter(|(t, _)| t.id() != entity.id()) {
@@ -136,7 +136,7 @@ pub fn update_boid_neighbors(
                 c.push(*target);
             }
         }
-        cohesion_neighbors.entities = c;
+        capture_neighbors.entities = c;
         separation_neighbors.entities = s;
     }
 }
@@ -226,7 +226,7 @@ pub fn update_boid_transforms(
 pub fn calculate_cohesion_inputs(
     mut query: Query<
         (&Transform, &mut BoidTurnDirectionInputs, &BoidColor),
-        (With<Boid>, Without<InputMap<Actions>>),
+        (With<Boid>, Without<Leader>),
     >,
     leader_query: Query<(&Transform, &BoidColor), With<Leader>>,
     mut lines: ResMut<DebugLines>,
