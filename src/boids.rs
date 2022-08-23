@@ -5,7 +5,6 @@ use bevy_inspector_egui::{Context, Inspectable};
 use bevy_prototype_debug_lines::DebugLines;
 use leafwing_input_manager::action_state::ActionData;
 use leafwing_input_manager::axislike::DualAxisData;
-use leafwing_input_manager::buttonlike::ButtonState;
 use leafwing_input_manager::prelude::*;
 use std::f32::consts::PI;
 use std::mem;
