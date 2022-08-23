@@ -4,9 +4,9 @@ mod math;
 
 use crate::boids::{
     calculate_alignment_inputs, calculate_cohesion_inputs, calculate_separation_inputs,
-    leader_removed, propagate_boid_color, update_boid_color, update_boid_neighbors,
-    update_boid_transforms, Boid, BoidColor, BoidNeighborsCaptureRange, BoidNeighborsSeparation,
-    BoidSettings, BoidTurnDirectionInputs, Leader,
+    leader_defeated, leader_removed, propagate_boid_color, update_boid_color,
+    update_boid_neighbors, update_boid_transforms, Boid, BoidColor, BoidNeighborsCaptureRange,
+    BoidNeighborsSeparation, BoidSettings, BoidTurnDirectionInputs, GameEvent, Leader,
 };
 use crate::camera::{update_camera_follow_system, Camera2dFollow};
 use crate::math::how_much_right_or_left;
@@ -16,7 +16,6 @@ use bevy::render::camera::ScalingMode;
 use bevy_inspector_egui::{InspectorPlugin, RegisterInspectable};
 use bevy_prototype_debug_lines::DebugLinesPlugin;
 use leafwing_input_manager::prelude::*;
-use math::Average;
 use std::f32::consts::PI;
 use turborand::prelude::*;
 
@@ -48,6 +47,7 @@ fn main() {
     .register_inspectable::<BoidNeighborsSeparation>()
     .register_inspectable::<Camera2dFollow>()
     .register_type::<BoidTurnDirectionInputs>()
+    .add_event::<GameEvent>()
     .add_startup_system(setup)
     .add_system_to_stage(CoreStage::First, update_boid_neighbors)
     .add_system_to_stage(CoreStage::PreUpdate, calculate_cohesion_inputs)
@@ -62,6 +62,7 @@ fn main() {
     .add_system_to_stage(CoreStage::Last, update_boid_transforms)
     .add_system(update_boid_color)
     .add_system(update_camera_follow_system)
+    .add_system(leader_defeated)
     .add_system_to_stage(CoreStage::PreUpdate, propagate_boid_color)
     .add_system_to_stage(CoreStage::PostUpdate, leader_removed);
 

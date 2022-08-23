@@ -340,10 +340,16 @@ pub fn update_boid_color(mut query: Query<(&mut Sprite, &BoidColor), Changed<Boi
     }
 }
 
+pub enum GameEvent {
+    LeaderCaptured(BoidColor),
+}
+
 pub fn propagate_boid_color(
     mut commands: Commands,
     mut query: Query<(Entity, &BoidNeighborsCaptureRange), With<Boid>>,
     mut boid_colors: Query<&mut BoidColor>,
+    leader_query: Query<&Leader>,
+    mut event_writer: EventWriter<GameEvent>,
 ) {
     for (entity, neighbors) in query.iter_mut() {
         let mut neighbor_color_counts: HashMap<BoidColor, usize> = HashMap::new();
@@ -351,19 +357,23 @@ pub fn propagate_boid_color(
             let count = neighbor_color_counts.entry(*other_color).or_insert(0);
             *count += 1;
         }
-        let dominate_color = neighbor_color_counts
-            .into_iter()
-            .max_by_key(|(_, c)| *c)
-            .map(|(c, _)| c);
-        if let Some(dominate_color) = dominate_color {
+        let dominate_color = neighbor_color_counts.into_iter().max_by_key(|(_, c)| *c);
+        if let Some((dominate_color, count)) = dominate_color {
             if let Ok(mut our_color) = boid_colors.get_mut(entity) {
-                if *our_color != dominate_color {
-                    let _ = mem::replace(&mut *our_color, dominate_color);
-                    // There can be only one leader!
-                    commands.entity(entity).remove::<Leader>();
-                    commands.entity(entity).remove::<InputMap<Actions>>();
+                // Decide if we should convert it
+                if *our_color != dominate_color && count > 1 {
+                    // Apply the conversion
+                    if leader_query.contains(entity) {
+                        // We converted a leader!
+                        event_writer.send(GameEvent::LeaderCaptured(*our_color))
+                        // We don't want to change the color yet as it will be handled in the
+                        // leader captured system.
+                    } else {
+                        let _ = mem::replace(&mut *our_color, dominate_color);
+                    }
                 }
             } else {
+                // Boids without a color always get converted.
                 commands.entity(entity).insert(dominate_color);
             }
         }
@@ -374,6 +384,30 @@ pub fn leader_removed(removals: RemovedComponents<Leader>, mut query: Query<&mut
     for entity in removals.iter() {
         if let Ok(mut transform) = query.get_mut(entity) {
             transform.scale = BOID_SCALE;
+        }
+    }
+}
+
+pub fn leader_defeated(
+    mut commands: Commands,
+    mut event_reader: EventReader<GameEvent>,
+    mut query: Query<(Entity, &BoidColor, &mut Sprite)>,
+) {
+    for event in event_reader.iter() {
+        match event {
+            GameEvent::LeaderCaptured(captured_color) => {
+                info!("{:?} Leader Defeated", captured_color);
+                for (entity, color, mut sprite) in query.iter_mut() {
+                    if color == captured_color {
+                        sprite.color = Color::WHITE;
+                        commands
+                            .entity(entity)
+                            .remove::<Leader>()
+                            .remove::<InputMap<Actions>>()
+                            .remove::<BoidColor>();
+                    }
+                }
+            }
         }
     }
 }
