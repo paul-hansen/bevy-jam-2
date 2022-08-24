@@ -5,7 +5,7 @@ mod ui;
 
 use crate::boids::{
     calculate_alignment_inputs, calculate_cohesion_inputs, calculate_separation_inputs,
-    leader_defeated, leader_removed, propagate_boid_color, update_boid_color,
+    clear_inputs, leader_defeated, leader_removed, propagate_boid_color, update_boid_color,
     update_boid_neighbors, update_boid_transforms, Boid, BoidColor, BoidNeighborsCaptureRange,
     BoidNeighborsSeparation, BoidSettings, BoidTurnDirectionInputs, GameEvent, Leader,
 };
@@ -15,6 +15,7 @@ use crate::ui::UiAppPlugin;
 use bevy::asset::AssetServerSettings;
 use bevy::prelude::*;
 use bevy::render::camera::ScalingMode;
+use bevy_egui_kbgp::KbgpPlugin;
 use bevy_inspector_egui::plugin::InspectorWindows;
 use bevy_inspector_egui::{InspectorPlugin, RegisterInspectable};
 use bevy_prototype_debug_lines::DebugLinesPlugin;
@@ -23,11 +24,17 @@ use std::f32::consts::PI;
 use turborand::prelude::*;
 
 const SCENE_HEIGHT: f32 = 500.0;
-const BOID_COUNT: usize = 400;
+const BOID_COUNT: usize = 1500;
 const ARENA_RADIUS: f32 = 1200.0;
 const ARENA_PADDING: f32 = 70.0;
 const BOID_SCALE: Vec3 = Vec3::splat(0.01);
 const LEADER_SCALE: Vec3 = Vec3::splat(0.014);
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub enum AppState {
+    PauseMenu,
+    Playing,
+}
 
 fn main() {
     let mut app = App::new();
@@ -48,10 +55,12 @@ fn main() {
     .add_plugin(InputManagerPlugin::<Actions>::default())
     .add_plugin(InputManagerPlugin::<GlobalActions>::default())
     .add_plugin(UiAppPlugin)
+    .add_plugin(KbgpPlugin)
     .register_inspectable::<BoidNeighborsCaptureRange>()
     .register_inspectable::<BoidNeighborsSeparation>()
     .register_inspectable::<Camera2dFollow>()
     .register_type::<BoidTurnDirectionInputs>()
+    .add_state::<AppState>(AppState::Playing)
     .add_event::<GameEvent>()
     .add_startup_system(setup)
     .add_system_to_stage(CoreStage::First, update_boid_neighbors)
@@ -64,7 +73,8 @@ fn main() {
         CoreStage::PreUpdate,
         calculate_alignment_inputs.after(calculate_separation_inputs),
     )
-    .add_system_to_stage(CoreStage::Last, update_boid_transforms)
+    .add_system_set(SystemSet::on_update(AppState::Playing).with_system(update_boid_transforms))
+    .add_system_to_stage(CoreStage::Last, clear_inputs)
     .add_system(update_boid_color)
     .add_system(update_camera_follow_system)
     .add_system(leader_defeated)

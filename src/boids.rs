@@ -176,7 +176,7 @@ pub fn update_boid_transforms(
         (
             &mut Transform,
             &mut ActionState<Actions>,
-            &mut BoidTurnDirectionInputs,
+            &BoidTurnDirectionInputs,
         ),
         With<Boid>,
     >,
@@ -184,7 +184,7 @@ pub fn update_boid_transforms(
     mut lines: ResMut<DebugLines>,
     boid_settings: Res<BoidSettings>,
 ) {
-    for (mut transform, mut action_state, mut inputs) in boid_query.iter_mut() {
+    for (mut transform, mut action_state, inputs) in boid_query.iter_mut() {
         if boid_settings.debug_lines {
             lines.line_colored(
                 transform.translation,
@@ -223,9 +223,12 @@ pub fn update_boid_transforms(
 
         transform.translation +=
             forward * time.delta_seconds() * boid_settings.speed * speed_multiplier;
+    }
+}
 
+pub fn clear_inputs(mut query: Query<(&mut BoidTurnDirectionInputs, &mut ActionState<Actions>)>) {
+    for (mut inputs, mut action_state) in query.iter_mut() {
         inputs.reset();
-
         action_state.set_action_data(Actions::Move, ActionData::default());
     }
 }
