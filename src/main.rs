@@ -1,6 +1,7 @@
 mod boids;
 mod camera;
 mod math;
+mod ui;
 
 use crate::boids::{
     calculate_alignment_inputs, calculate_cohesion_inputs, calculate_separation_inputs,
@@ -10,9 +11,11 @@ use crate::boids::{
 };
 use crate::camera::{update_camera_follow_system, Camera2dFollow};
 use crate::math::how_much_right_or_left;
+use crate::ui::UiAppPlugin;
 use bevy::asset::AssetServerSettings;
 use bevy::prelude::*;
 use bevy::render::camera::ScalingMode;
+use bevy_inspector_egui::plugin::InspectorWindows;
 use bevy_inspector_egui::{InspectorPlugin, RegisterInspectable};
 use bevy_prototype_debug_lines::DebugLinesPlugin;
 use leafwing_input_manager::prelude::*;
@@ -43,6 +46,8 @@ fn main() {
     .add_plugin(InspectorPlugin::<BoidSettings>::new())
     .add_plugin(DebugLinesPlugin::default())
     .add_plugin(InputManagerPlugin::<Actions>::default())
+    .add_plugin(InputManagerPlugin::<GlobalActions>::default())
+    .add_plugin(UiAppPlugin)
     .register_inspectable::<BoidNeighborsCaptureRange>()
     .register_inspectable::<BoidNeighborsSeparation>()
     .register_inspectable::<Camera2dFollow>()
@@ -66,8 +71,16 @@ fn main() {
     .add_system_to_stage(CoreStage::PreUpdate, propagate_boid_color)
     .add_system_to_stage(CoreStage::PostUpdate, leader_removed);
 
-    #[cfg(debug_assertions)]
-    app.add_plugin(bevy_inspector_egui::WorldInspectorPlugin::new());
+    // Might disable this for release builds in the future
+    app.add_plugin(bevy_inspector_egui::WorldInspectorPlugin::new())
+        .insert_resource(bevy_inspector_egui::WorldInspectorParams {
+            ignore_components: Default::default(),
+            read_only_components: Default::default(),
+            sort_components: false,
+            enabled: false,
+            highlight_changes: true,
+            ..default()
+        });
 
     app.run();
 }
@@ -77,19 +90,58 @@ pub enum Actions {
     Move,
 }
 
+/// Actions that any player can trigger
+#[derive(Actionlike, PartialEq, Eq, Clone, Copy, Hash, Debug)]
+pub enum GlobalActions {
+    ToggleMenu,
+    ToggleBoidSettings,
+    ToggleWorldInspector,
+}
+
 fn setup(
     mut commands: Commands,
     asset_server: ResMut<AssetServer>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
+    mut inspector_windows: ResMut<InspectorWindows>,
 ) {
-    commands.spawn_bundle(ColorMesh2dBundle {
-        mesh: meshes
-            .add(Mesh::from(shape::Circle::new(ARENA_RADIUS)))
-            .into(),
-        material: materials.add(ColorMaterial::from(Color::hex("6c99c0").unwrap())),
-        ..default()
-    });
+    let inspector_window_data = inspector_windows.window_data_mut::<BoidSettings>();
+    inspector_window_data.visible = false;
+    commands
+        .spawn_bundle(ColorMesh2dBundle {
+            mesh: meshes
+                .add(Mesh::from(shape::Circle::new(ARENA_RADIUS)))
+                .into(),
+            material: materials.add(ColorMaterial::from(Color::hex("6c99c0").unwrap())),
+            ..default()
+        })
+        .insert_bundle(InputManagerBundle {
+            action_state: default(),
+            input_map: {
+                InputMap::<GlobalActions>::default()
+                    .insert(KeyCode::Escape, GlobalActions::ToggleMenu)
+                    .insert(GamepadButtonType::East, GlobalActions::ToggleMenu)
+                    .insert(GamepadButtonType::Select, GlobalActions::ToggleMenu)
+                    .insert(GamepadButtonType::Start, GlobalActions::ToggleMenu)
+                    .insert_chord(
+                        [KeyCode::LAlt, KeyCode::B],
+                        GlobalActions::ToggleBoidSettings,
+                    )
+                    .insert_chord(
+                        [KeyCode::RAlt, KeyCode::B],
+                        GlobalActions::ToggleBoidSettings,
+                    )
+                    .insert_chord(
+                        [KeyCode::LAlt, KeyCode::N],
+                        GlobalActions::ToggleWorldInspector,
+                    )
+                    .insert_chord(
+                        [KeyCode::RAlt, KeyCode::N],
+                        GlobalActions::ToggleWorldInspector,
+                    )
+                    .build()
+            },
+        });
 
     let rand = Rng::new();
     for x in 0..BOID_COUNT {
