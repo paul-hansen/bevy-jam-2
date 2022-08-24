@@ -24,7 +24,7 @@ use std::f32::consts::PI;
 use turborand::prelude::*;
 
 const SCENE_HEIGHT: f32 = 500.0;
-const BOID_COUNT: usize = 1500;
+const BOID_COUNT: usize = 400;
 const ARENA_RADIUS: f32 = 1200.0;
 const ARENA_PADDING: f32 = 70.0;
 const BOID_SCALE: Vec3 = Vec3::splat(0.01);
@@ -175,7 +175,7 @@ fn setup_game(
     // Spawn a root node to attach everything to so we can recursively delete everything
     // when reloading.
     if let Ok(root) = scene_root.get_single() {
-        warn!("restarted");
+        info!("Restarting");
         commands.entity(root).despawn_recursive();
     }
     let scene_root = commands

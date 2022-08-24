@@ -1,13 +1,18 @@
+use crate::ui::style::get_style;
 use crate::{AppState, BoidSettings, GlobalActions};
 use bevy::app::AppExit;
 use bevy::prelude::*;
-use bevy_egui::egui::{Align, Align2, Layout};
+use bevy_egui::egui::Align2;
 use bevy_egui::{egui, EguiContext};
 use bevy_egui_kbgp::KbgpEguiResponseExt;
 use bevy_inspector_egui::plugin::InspectorWindows;
 use bevy_inspector_egui::WorldInspectorParams;
 use egui::vec2;
 use leafwing_input_manager::prelude::*;
+
+pub fn set_ui_theme(mut ctx: ResMut<EguiContext>) {
+    ctx.ctx_mut().set_style(get_style());
+}
 
 pub fn draw_pause_menu(
     mut egui_context: ResMut<EguiContext>,
@@ -18,9 +23,9 @@ pub fn draw_pause_menu(
         .anchor(Align2::CENTER_CENTER, vec2(0.0, 120.0))
         .resizable(false)
         .collapsible(false)
-        .min_width(200.0)
         .show(egui_context.ctx_mut(), |ui| {
-            ui.with_layout(Layout::top_down_justified(Align::LEFT), |ui| {
+            ui.set_width(200.0);
+            ui.vertical_centered_justified(|ui| {
                 if app_state.inactives().contains(&AppState::Playing)
                     && ui
                         .button("Resume")
