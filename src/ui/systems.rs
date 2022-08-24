@@ -15,7 +15,7 @@ pub fn draw_pause_menu(
     mut app_state: ResMut<State<AppState>>,
 ) {
     egui::Window::new("Game Paused")
-        .anchor(Align2::CENTER_CENTER, vec2(0.0, 100.0))
+        .anchor(Align2::CENTER_CENTER, vec2(0.0, 120.0))
         .resizable(false)
         .collapsible(false)
         .min_width(200.0)
@@ -30,6 +30,12 @@ pub fn draw_pause_menu(
                 {
                     if let Err(e) = app_state.pop() {
                         error!("Error resuming game: {e}");
+                    };
+                }
+
+                if ui.button("Restart").kbgp_navigation().clicked() {
+                    if let Err(e) = app_state.set(AppState::Setup) {
+                        error!("Error when restarting game: {e}");
                     };
                 }
                 if ui.button("Exit Game").kbgp_navigation().clicked() {
@@ -61,6 +67,7 @@ pub fn toggle_pause_menu(
                     info!("Transitioning to {:?}", AppState::PauseMenu)
                 }
             }
+            _ => {}
         }
     }
 }

@@ -32,6 +32,8 @@ const LEADER_SCALE: Vec3 = Vec3::splat(0.014);
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum AppState {
+    Intro,
+    Setup,
     PauseMenu,
     Playing,
 }
@@ -60,9 +62,10 @@ fn main() {
     .register_inspectable::<BoidNeighborsSeparation>()
     .register_inspectable::<Camera2dFollow>()
     .register_type::<BoidTurnDirectionInputs>()
-    .add_state::<AppState>(AppState::Playing)
+    .add_state::<AppState>(AppState::Intro)
     .add_event::<GameEvent>()
     .add_startup_system(setup)
+    .add_system_set(SystemSet::on_enter(AppState::Setup).with_system(setup_game))
     .add_system_to_stage(CoreStage::First, update_boid_neighbors)
     .add_system_to_stage(CoreStage::PreUpdate, calculate_cohesion_inputs)
     .add_system_to_stage(
@@ -110,10 +113,10 @@ pub enum GlobalActions {
 
 fn setup(
     mut commands: Commands,
-    asset_server: ResMut<AssetServer>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
     mut inspector_windows: ResMut<InspectorWindows>,
+    mut app_state: ResMut<bevy::prelude::State<AppState>>,
 ) {
     let inspector_window_data = inspector_windows.window_data_mut::<BoidSettings>();
     inspector_window_data.visible = false;
@@ -153,6 +156,35 @@ fn setup(
             },
         });
 
+    if let Err(e) = app_state.overwrite_set(AppState::Setup) {
+        error!("Error while setting up game: {e}")
+    } else {
+        info!("App state transitioned to Playing")
+    };
+}
+
+#[derive(Component, Debug, Copy, Clone)]
+pub struct SceneRoot;
+
+fn setup_game(
+    mut commands: Commands,
+    asset_server: ResMut<AssetServer>,
+    mut app_state: ResMut<bevy::prelude::State<AppState>>,
+    scene_root: Query<Entity, With<SceneRoot>>,
+) {
+    // Spawn a root node to attach everything to so we can recursively delete everything
+    // when reloading.
+    if let Ok(root) = scene_root.get_single() {
+        warn!("restarted");
+        commands.entity(root).despawn_recursive();
+    }
+    let scene_root = commands
+        .spawn()
+        .insert(Name::new("Root"))
+        .insert(SceneRoot)
+        .insert_bundle(SpatialBundle::default())
+        .id();
+
     let rand = Rng::new();
     for x in 0..BOID_COUNT {
         let r = (ARENA_RADIUS - ARENA_PADDING) * rand.f32();
@@ -181,7 +213,7 @@ fn setup(
         }
 
         if x == 0 {
-            commands
+            let camera = commands
                 .spawn_bundle(Camera2dBundle {
                     projection: OrthographicProjection {
                         scaling_mode: ScalingMode::FixedVertical(SCENE_HEIGHT),
@@ -192,7 +224,9 @@ fn setup(
                 .insert(Camera2dFollow {
                     target: entity,
                     offset: Default::default(),
-                });
+                })
+                .id();
+            commands.entity(scene_root).add_child(camera);
             commands.entity(entity).insert(
                 InputMap::<Actions>::default()
                     .insert(VirtualDPad::wasd(), Actions::Move)
@@ -201,5 +235,12 @@ fn setup(
                     .build(),
             );
         }
+
+        commands.entity(scene_root).add_child(entity);
     }
+    if let Err(e) = app_state.overwrite_set(AppState::Playing) {
+        error!("Error while starting game: {e}")
+    } else {
+        info!("App state transitioned to Playing")
+    };
 }
