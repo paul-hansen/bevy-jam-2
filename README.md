@@ -1,7 +1,7 @@
 ## Title TBD
 
-This is a game where you control the direction of a flock of birds, and your goal is to combine your flock with all the other flocks while maintaining control.
-You can only merge with flocks that are smaller than your flock though, or they will take over your flock instead.
+This is a game where you control the direction of a group of `[birds?]`, and your goal is to combine your group with all the other flocks while maintaining control.
+You can only merge with groups that are smaller than your group though, or they will take over your group instead.
 
 This game was made for the Bevy game jam #2 which you can [find here](https://itch.io/jam/bevy-jam-2). The theme of the jam is "Combine".
 
@@ -13,8 +13,14 @@ You can try it [in your web browser](https://prawl.itch.io/bevy-game-jam-2?secre
 Or you can find the latest download under ["assets" here](https://github.com/paul-hansen/bevy-jam-2/releases/tag/v0.1.0).
 
 ## Project status
-It's very WIP right now, it only has a basic [boid behavior](https://en.wikipedia.org/wiki/Boids) implemented (and even that can use some work). Fun to play around with the settings though.
-![2d top down view of flying triangles exhibiting somewhat bird-like flocking behavior](screenshots/bevy-game-jam-2.gif)
+
+You can fly around, collect followers and take out other groups.
+
+### Known issues
+
+- There is no win or loose screen. If you get captured you have to press escape to open the menu and restart.
+- Followers don't separate correctly and will overlap each other.
+- The capture logic could use some work to seem more "fair". Sometimes your group will lose to a smaller one simply because their group is more densely packed.
 
 ## License
 
