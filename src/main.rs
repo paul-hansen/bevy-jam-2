@@ -9,7 +9,7 @@ use crate::boids::{
     update_boid_neighbors, update_boid_transforms, Boid, BoidColor, BoidNeighborsCaptureRange,
     BoidNeighborsSeparation, BoidSettings, BoidTurnDirectionInputs, GameEvent, Leader,
 };
-use crate::camera::{update_camera_follow_system, Camera2dFollow};
+use crate::camera::{camera_zoom, update_camera_follow_system, Camera2dFollow};
 use crate::math::how_much_right_or_left;
 use crate::ui::UiAppPlugin;
 use bevy::asset::AssetServerSettings;
@@ -80,6 +80,7 @@ fn main() {
     .add_system_to_stage(CoreStage::Last, clear_inputs)
     .add_system(update_boid_color)
     .add_system(update_camera_follow_system)
+    .add_system(camera_zoom)
     .add_system(leader_defeated)
     .add_system_to_stage(CoreStage::PreUpdate, propagate_boid_color)
     .add_system_to_stage(CoreStage::PostUpdate, leader_removed);
@@ -101,6 +102,7 @@ fn main() {
 #[derive(Actionlike, PartialEq, Eq, Clone, Copy, Hash, Debug)]
 pub enum Actions {
     Move,
+    CameraZoom,
 }
 
 /// Actions that any player can trigger
@@ -232,6 +234,8 @@ fn setup_game(
                     .insert(VirtualDPad::wasd(), Actions::Move)
                     .insert(VirtualDPad::arrow_keys(), Actions::Move)
                     .insert(DualAxis::left_stick(), Actions::Move)
+                    .insert(VirtualDPad::dpad(), Actions::CameraZoom)
+                    .insert(VirtualDPad::mouse_wheel(), Actions::CameraZoom)
                     .build(),
             );
         }
