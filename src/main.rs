@@ -38,7 +38,13 @@ pub enum AppState {
     Intro,
     Setup,
     PauseMenu,
+    GameOver,
     Playing,
+}
+
+#[derive(Debug, Clone)]
+pub struct Winner {
+    pub color: BoidColor,
 }
 
 fn main() {

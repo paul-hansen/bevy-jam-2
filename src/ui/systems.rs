@@ -1,5 +1,5 @@
 use crate::ui::style::get_style;
-use crate::{AppState, BoidSettings, GlobalActions};
+use crate::{AppState, BoidSettings, GlobalActions, Winner};
 use bevy::app::AppExit;
 use bevy::prelude::*;
 use bevy_egui::egui::Align2;
@@ -39,6 +39,40 @@ pub fn draw_pause_menu(
                 }
 
                 if ui.button("Restart").kbgp_navigation().clicked() {
+                    if let Err(e) = app_state.set(AppState::Setup) {
+                        error!("Error when restarting game: {e}");
+                    };
+                }
+                if ui.button("Exit Game").kbgp_navigation().clicked() {
+                    exit.send(AppExit);
+                };
+            });
+        });
+}
+
+pub fn draw_game_over(
+    mut egui_context: ResMut<EguiContext>,
+    mut exit: EventWriter<AppExit>,
+    mut app_state: ResMut<State<AppState>>,
+    winner: Option<Res<Winner>>,
+) {
+    let title = match winner {
+        None => "Tie!".to_string(),
+        Some(winner) => format!("{:?} Won!", winner.color),
+    };
+    egui::Window::new(title)
+        .anchor(Align2::CENTER_CENTER, vec2(0.0, 120.0))
+        .resizable(false)
+        .collapsible(false)
+        .show(egui_context.ctx_mut(), |ui| {
+            ui.set_width(200.0);
+            ui.vertical_centered_justified(|ui| {
+                if ui
+                    .button("Restart")
+                    .kbgp_navigation()
+                    .kbgp_initial_focus()
+                    .clicked()
+                {
                     if let Err(e) = app_state.set(AppState::Setup) {
                         error!("Error when restarting game: {e}");
                     };

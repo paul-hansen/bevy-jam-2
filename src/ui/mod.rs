@@ -14,6 +14,9 @@ impl Plugin for UiAppPlugin {
             .add_system_set(SystemSet::on_update(AppState::PauseMenu).with_system(draw_pause_menu))
             .add_system_set(SystemSet::on_enter(AppState::PauseMenu).with_system(unlock_mouse))
             .add_system_set(SystemSet::on_exit(AppState::PauseMenu).with_system(lock_mouse))
+            .add_system_set(SystemSet::on_update(AppState::GameOver).with_system(draw_game_over))
+            .add_system_set(SystemSet::on_enter(AppState::GameOver).with_system(unlock_mouse))
+            .add_system_set(SystemSet::on_exit(AppState::GameOver).with_system(lock_mouse))
             .add_system(toggle_pause_menu)
             .add_system(toggle_boid_settings)
             .add_system(toggle_world_inspector);

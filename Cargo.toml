@@ -14,6 +14,8 @@ bevy_prototype_debug_lines = "0.8.1"
 leafwing-input-manager = "0.5.2"
 bevy_egui = "0.15.1"
 bevy-egui-kbgp = "0.7.0"
+# itertools was already being pulled in by leafwing-input-manager, might as well use it too.
+itertools = "0.10"
 
 [profile.dev]
 opt-level = 1

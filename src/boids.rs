@@ -1,8 +1,11 @@
-use crate::{how_much_right_or_left, Actions, ARENA_PADDING, ARENA_RADIUS, BOID_SCALE};
+use crate::{
+    how_much_right_or_left, Actions, AppState, Winner, ARENA_PADDING, ARENA_RADIUS, BOID_SCALE,
+};
 use bevy::prelude::*;
 use bevy_inspector_egui::egui::Ui;
 use bevy_inspector_egui::{Context, Inspectable};
 use bevy_prototype_debug_lines::DebugLines;
+use itertools::Itertools;
 use leafwing_input_manager::action_state::ActionData;
 use leafwing_input_manager::axislike::DualAxisData;
 use leafwing_input_manager::orientation::{Orientation, Rotation};
@@ -430,6 +433,7 @@ pub fn update_boid_color(mut query: Query<(&mut Sprite, &BoidColor), Changed<Boi
 
 pub enum GameEvent {
     LeaderCaptured(BoidColor),
+    GameOver(Winner),
 }
 
 pub fn propagate_boid_color(
@@ -465,6 +469,16 @@ pub fn propagate_boid_color(
                 commands.entity(entity).insert(dominate_color);
             }
         }
+
+        // Check if there is only one color left
+        let mut remaining_colors = boid_colors.iter().unique();
+        if let Some(first_color) = remaining_colors.next() {
+            if remaining_colors.count() == 0 {
+                event_writer.send(GameEvent::GameOver(Winner {
+                    color: *first_color,
+                }));
+            }
+        }
     }
 }
 
@@ -480,6 +494,7 @@ pub fn leader_defeated(
     mut commands: Commands,
     mut event_reader: EventReader<GameEvent>,
     mut query: Query<(Entity, &BoidColor, &mut Sprite)>,
+    mut app_state: ResMut<State<AppState>>,
 ) {
     for event in event_reader.iter() {
         match event {
@@ -495,6 +510,12 @@ pub fn leader_defeated(
                             .remove::<BoidColor>();
                     }
                 }
+            }
+            GameEvent::GameOver(winner) => {
+                commands.insert_resource(winner.clone());
+                if let Err(e) = app_state.replace(AppState::GameOver) {
+                    error!("Failed to change app state to game over: {e}");
+                };
             }
         }
     }
