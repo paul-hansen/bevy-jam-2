@@ -236,6 +236,7 @@ fn setup_game(
                 InputMap::<Actions>::default()
                     .insert(VirtualDPad::wasd(), Actions::Move)
                     .insert(VirtualDPad::arrow_keys(), Actions::Move)
+                    .insert(VirtualDPad::mouse_motion(), Actions::Move)
                     .insert(DualAxis::left_stick(), Actions::Move)
                     .insert(VirtualDPad::dpad(), Actions::CameraZoom)
                     .insert(VirtualDPad::mouse_wheel(), Actions::CameraZoom)

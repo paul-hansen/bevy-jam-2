@@ -10,7 +10,10 @@ pub struct UiAppPlugin;
 impl Plugin for UiAppPlugin {
     fn build(&self, app: &mut App) {
         app.add_startup_system(set_ui_theme)
+            .add_startup_system(lock_mouse)
             .add_system_set(SystemSet::on_update(AppState::PauseMenu).with_system(draw_pause_menu))
+            .add_system_set(SystemSet::on_enter(AppState::PauseMenu).with_system(unlock_mouse))
+            .add_system_set(SystemSet::on_exit(AppState::PauseMenu).with_system(lock_mouse))
             .add_system(toggle_pause_menu)
             .add_system(toggle_boid_settings)
             .add_system(toggle_world_inspector);

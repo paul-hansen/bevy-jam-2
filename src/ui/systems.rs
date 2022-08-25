@@ -77,6 +77,18 @@ pub fn toggle_pause_menu(
     }
 }
 
+pub fn lock_mouse(mut windows: ResMut<Windows>) {
+    let window = windows.get_primary_mut().unwrap();
+    window.set_cursor_lock_mode(true);
+    window.set_cursor_visibility(false);
+}
+
+pub fn unlock_mouse(mut windows: ResMut<Windows>) {
+    let window = windows.get_primary_mut().unwrap();
+    window.set_cursor_lock_mode(false);
+    window.set_cursor_visibility(true);
+}
+
 pub fn toggle_boid_settings(
     mut inspector_windows: ResMut<InspectorWindows>,
     action_state: Query<&ActionState<GlobalActions>>,
