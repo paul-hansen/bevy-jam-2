@@ -253,8 +253,38 @@ fn setup_game(
                     .insert(DualAxis::left_stick(), Actions::Direction)
                     .insert(VirtualDPad::dpad(), Actions::CameraZoom)
                     .insert(VirtualDPad::mouse_wheel(), Actions::CameraZoom)
+                    // I don't know of a virtual single axis?
+                    // Using the virtual dpad to get around that.
+                    .insert(
+                        VirtualDPad {
+                            up: KeyCode::NumpadAdd.into(),
+                            down: KeyCode::NumpadSubtract.into(),
+                            left: KeyCode::NumpadSubtract.into(),
+                            right: KeyCode::NumpadAdd.into(),
+                        },
+                        Actions::CameraZoom,
+                    )
+                    .insert(
+                        VirtualDPad {
+                            up: KeyCode::Equals.into(),
+                            down: KeyCode::Minus.into(),
+                            left: KeyCode::Minus.into(),
+                            right: KeyCode::Equals.into(),
+                        },
+                        Actions::CameraZoom,
+                    )
+                    .insert(
+                        VirtualDPad {
+                            up: KeyCode::R.into(),
+                            down: KeyCode::F.into(),
+                            left: KeyCode::R.into(),
+                            right: KeyCode::F.into(),
+                        },
+                        Actions::CameraZoom,
+                    )
                     .insert(KeyCode::Space, Actions::Boost)
                     .insert(KeyCode::Up, Actions::Boost)
+                    .insert(KeyCode::LShift, Actions::Boost)
                     .insert(GamepadButtonType::South, Actions::Boost)
                     .insert(GamepadButtonType::RightTrigger, Actions::Boost)
                     .insert(MouseButton::Left, Actions::Boost)
