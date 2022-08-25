@@ -191,6 +191,10 @@ pub enum BoidColor {
     Green,
     Blue,
     Yellow,
+    Purple,
+    Orange,
+    Pink,
+    Cyan,
 }
 
 impl BoidColor {
@@ -200,6 +204,10 @@ impl BoidColor {
             1 => Some(Self::Green),
             2 => Some(Self::Blue),
             3 => Some(Self::Yellow),
+            4 => Some(Self::Purple),
+            5 => Some(Self::Orange),
+            6 => Some(Self::Pink),
+            7 => Some(Self::Cyan),
             _ => None,
         }
     }
@@ -210,6 +218,10 @@ impl BoidColor {
             BoidColor::Green => Color::GREEN,
             BoidColor::Blue => Color::BLUE,
             BoidColor::Yellow => Color::YELLOW,
+            BoidColor::Purple => Color::PURPLE,
+            BoidColor::Orange => Color::ORANGE,
+            BoidColor::Pink => Color::PINK,
+            BoidColor::Cyan => Color::CYAN,
         }
     }
 }
