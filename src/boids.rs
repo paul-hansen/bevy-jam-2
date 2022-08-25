@@ -16,8 +16,15 @@ pub struct BoidSettings {
     cohesion_enabled: bool,
     separation_enabled: bool,
     alignment_enabled: bool,
+    /// The maximum speed the boid is allowed to go in units per second
     #[inspectable(min = 0.0, max = 9999.0)]
-    speed: f32,
+    max_speed: f32,
+    /// The minimum speed the boid is allowed to go in units per second
+    #[inspectable(min = 0.0, max = 9999.0)]
+    min_speed: f32,
+    /// The amount the boid's speed changes by in units per second
+    #[inspectable(min = 0.0, max = 9999.0)]
+    acceleration: f32,
     #[inspectable(min = 0.0, max = PI * 180.0)]
     max_turn_rate_per_second: f32,
     #[inspectable(min = 0.0, max = 1000.0)]
@@ -33,7 +40,9 @@ impl Default for BoidSettings {
             cohesion_enabled: true,
             separation_enabled: true,
             alignment_enabled: true,
-            speed: 80.0,
+            max_speed: 120.0,
+            min_speed: 60.0,
+            acceleration: 200.0,
             max_turn_rate_per_second: PI * 2.8,
             separation_distance: 15.0,
             capture_range: 20.0,
@@ -44,6 +53,11 @@ impl Default for BoidSettings {
 
 #[derive(Component, Default)]
 pub struct Boid {}
+
+#[derive(Component, Default, Debug)]
+pub struct Velocity {
+    forward: f32,
+}
 
 #[derive(Component, Default)]
 pub struct BoidNeighborsCaptureRange {
@@ -73,32 +87,54 @@ impl Inspectable for BoidNeighborsSeparation {
     }
 }
 
+// Collects inputs every frame and averages them.
+// Gives equal weight to the different factors pulling on the boids.
+// Makes them jiggle back and forth less than adding all the inputs.
 #[derive(Component, Default, Reflect)]
 #[reflect(Component)]
-pub struct BoidTurnDirectionInputs {
-    average: f32,
-    count: u32,
+pub struct BoidAveragedInputs {
+    turn_average: f32,
+    turn_count: u32,
+    speed_average: f32,
+    speed_count: u32,
 }
 
-impl BoidTurnDirectionInputs {
-    pub fn add(&mut self, direction: f32) {
+impl BoidAveragedInputs {
+    pub fn add_turn(&mut self, direction: f32) {
         if direction.is_nan() {
             error!("Tried to add nan to inputs");
         } else {
-            self.count += 1;
-            self.average =
-                ((self.average * (self.count - 1) as f32) + direction) / self.count as f32;
+            self.turn_count += 1;
+            self.turn_average = ((self.turn_average * (self.turn_count - 1) as f32) + direction)
+                / self.turn_count as f32;
         }
     }
 
-    pub fn average(&self) -> f32 {
-        debug_assert!(!self.average.is_nan());
-        self.average
+    pub fn turn_average(&self) -> f32 {
+        debug_assert!(!self.turn_average.is_nan());
+        self.turn_average
+    }
+
+    pub fn add_speed(&mut self, input: f32) {
+        if input.is_nan() {
+            error!("Tried to add nan to inputs");
+        } else {
+            self.speed_count += 1;
+            self.speed_average = ((self.speed_average * (self.speed_count - 1) as f32) + input)
+                / self.speed_count as f32;
+        }
+    }
+
+    pub fn speed_average(&self) -> f32 {
+        debug_assert!(!self.speed_average.is_nan());
+        self.speed_average
     }
 
     pub fn reset(&mut self) {
-        self.average = 0.0;
-        self.count = 0;
+        self.turn_average = 0.0;
+        self.speed_average = 0.0;
+        self.turn_count = 0;
+        self.speed_count = 0;
     }
 }
 
@@ -176,7 +212,8 @@ pub fn update_boid_transforms(
         (
             &mut Transform,
             &mut ActionState<Actions>,
-            &BoidTurnDirectionInputs,
+            &BoidAveragedInputs,
+            &mut Velocity,
         ),
         With<Boid>,
     >,
@@ -184,7 +221,7 @@ pub fn update_boid_transforms(
     mut lines: ResMut<DebugLines>,
     boid_settings: Res<BoidSettings>,
 ) {
-    for (mut transform, mut action_state, inputs) in boid_query.iter_mut() {
+    for (mut transform, mut action_state, inputs, mut velocity) in boid_query.iter_mut() {
         if boid_settings.debug_lines {
             lines.line_colored(
                 transform.translation,
@@ -195,7 +232,7 @@ pub fn update_boid_transforms(
         }
 
         let forward = transform.up();
-        let mut speed_multiplier = 1.0;
+        let mut acceleration_input = 0.0;
 
         // if headed out of bounds, rotate towards the center
         let direction = -transform.translation.truncate();
@@ -210,23 +247,26 @@ pub fn update_boid_transforms(
             add_axis_input(
                 &mut action_state,
                 Actions::Move,
-                DualAxisData::new(-inputs.average(), 0.0),
+                DualAxisData::new(-inputs.turn_average(), inputs.speed_average()),
             );
 
             if let Some(axis_data) = action_state.clamped_axis_pair(Actions::Move) {
                 transform.rotate_z(
                     -axis_data.x() * boid_settings.max_turn_rate_per_second * time.delta_seconds(),
                 );
-                speed_multiplier += axis_data.y();
+                acceleration_input = axis_data.y();
             }
         }
 
-        transform.translation +=
-            forward * time.delta_seconds() * boid_settings.speed * speed_multiplier;
+        velocity.forward += boid_settings.acceleration * acceleration_input * time.delta_seconds();
+        velocity.forward = velocity
+            .forward
+            .clamp(boid_settings.min_speed, boid_settings.max_speed);
+        transform.translation += forward * time.delta_seconds() * velocity.forward;
     }
 }
 
-pub fn clear_inputs(mut query: Query<(&mut BoidTurnDirectionInputs, &mut ActionState<Actions>)>) {
+pub fn clear_inputs(mut query: Query<(&mut BoidAveragedInputs, &mut ActionState<Actions>)>) {
     for (mut inputs, mut action_state) in query.iter_mut() {
         inputs.reset();
         action_state.set_action_data(Actions::Move, ActionData::default());
@@ -236,32 +276,36 @@ pub fn clear_inputs(mut query: Query<(&mut BoidTurnDirectionInputs, &mut ActionS
 #[allow(clippy::type_complexity)]
 pub fn calculate_cohesion_inputs(
     mut query: Query<
-        (&Transform, &mut BoidTurnDirectionInputs, &BoidColor),
+        (&Transform, &mut BoidAveragedInputs, &BoidColor, &Velocity),
         (With<Boid>, Without<Leader>),
     >,
-    leader_query: Query<(&Transform, &BoidColor), With<Leader>>,
+    leader_query: Query<(&Transform, &BoidColor, &Velocity), With<Leader>>,
     mut lines: ResMut<DebugLines>,
     boid_settings: Res<BoidSettings>,
 ) {
     if !boid_settings.cohesion_enabled {
         return;
     }
-    // Rotate towards the average position of other boids within cohesion range.
-    for (transform, mut inputs, color) in query.iter_mut() {
-        if let Some((leader_transform, _)) = leader_query.iter().find(|(_, c)| *c == color) {
-            let average_position_of_near_boids = leader_transform.translation.truncate();
-            if average_position_of_near_boids.is_nan() {
-                // There were no neighbors so it divided by zero when averaging.
-                // We don't need to add any inputs if it has no neighbors so we move on..
-                continue;
-            }
-            let direction_to_target =
-                (average_position_of_near_boids - transform.translation.truncate()).normalize();
+    // Turn and move towards the leader's position if they have one.
+    for (transform, mut inputs, color, velocity) in query.iter_mut() {
+        if let Some((leader_transform, _, leader_velocity)) =
+            leader_query.iter().find(|(_, c, _)| *c == color)
+        {
+            let leader_position = leader_transform.translation.truncate();
 
-            let turn_direction_to_center_of_near = -how_much_right_or_left(
+            let direction_to_target =
+                (leader_position - transform.translation.truncate()).normalize();
+
+            let turn_towards_leader_direction = -how_much_right_or_left(
                 transform,
                 &(transform.translation.truncate() + direction_to_target),
             );
+            let speed_up_down = match leader_velocity.forward - velocity.forward {
+                x if x > 120.0 => 1.0,
+                x if x > 0.0 => 0.5,
+                x if x < -3.0 => -1.0,
+                _ => 0.0,
+            };
             if boid_settings.debug_lines {
                 lines.line_gradient(
                     transform.translation,
@@ -271,7 +315,9 @@ pub fn calculate_cohesion_inputs(
                     Color::rgba(0.2, 1.0, 0.2, 0.0),
                 );
             }
-            inputs.add(turn_direction_to_center_of_near);
+
+            inputs.add_turn(turn_towards_leader_direction);
+            inputs.add_speed(speed_up_down);
         }
     }
 }
@@ -282,7 +328,7 @@ pub fn calculate_separation_inputs(
         (
             &Transform,
             &BoidNeighborsSeparation,
-            &mut BoidTurnDirectionInputs,
+            &mut BoidAveragedInputs,
         ),
         (With<Boid>, Without<InputMap<Actions>>),
     >,
@@ -308,7 +354,7 @@ pub fn calculate_separation_inputs(
                         Color::rgba(1.0, 0.0, 0.0, 0.2),
                     );
                 }
-                inputs.add(direction);
+                inputs.add_turn(direction);
             });
     }
 }
@@ -316,7 +362,7 @@ pub fn calculate_separation_inputs(
 #[allow(clippy::type_complexity)]
 pub fn calculate_alignment_inputs(
     mut query: Query<
-        (&Transform, &mut BoidTurnDirectionInputs, &BoidColor),
+        (&Transform, &mut BoidAveragedInputs, &BoidColor),
         (With<Boid>, Without<InputMap<Actions>>),
     >,
     leader_query: Query<(&Transform, &BoidColor), With<Leader>>,
@@ -337,7 +383,7 @@ pub fn calculate_alignment_inputs(
                     Color::VIOLET,
                 );
             }
-            inputs.add(-how_much_right_or_left(
+            inputs.add_turn(-how_much_right_or_left(
                 &Transform::from_rotation(transform.rotation),
                 &average,
             ));
