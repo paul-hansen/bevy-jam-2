@@ -15,6 +15,7 @@ use crate::ui::UiAppPlugin;
 use bevy::asset::AssetServerSettings;
 use bevy::prelude::*;
 use bevy::render::camera::ScalingMode;
+use bevy::window::WindowMode;
 use bevy_egui_kbgp::KbgpPlugin;
 use bevy_inspector_egui::plugin::InspectorWindows;
 use bevy_inspector_egui::{InspectorPlugin, RegisterInspectable};
@@ -42,6 +43,7 @@ fn main() {
     let mut app = App::new();
     app.insert_resource(WindowDescriptor {
         fit_canvas_to_parent: true,
+        mode: WindowMode::BorderlessFullscreen,
         ..Default::default()
     })
     .insert_resource(Msaa { samples: 4 })
