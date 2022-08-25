@@ -18,7 +18,7 @@ You can fly around, collect followers and take out other groups.
 
 ### Known issues
 
-- There is no win or loose screen. If you get captured you have to press escape to open the menu and restart.
+- If you are captured and there are more than two remaining colors you will still be watching the game. Press escape to open the menu to restart early.
 - Followers don't separate correctly and will overlap each other.
 - The capture logic could use some work to seem more "fair". Sometimes your group will lose to a smaller one simply because their group is more densely packed.
 
