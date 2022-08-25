@@ -20,7 +20,9 @@ use bevy_egui_kbgp::KbgpPlugin;
 use bevy_inspector_egui::plugin::InspectorWindows;
 use bevy_inspector_egui::{InspectorPlugin, RegisterInspectable};
 use bevy_prototype_debug_lines::DebugLinesPlugin;
+use leafwing_input_manager::buttonlike::MouseMotionDirection;
 use leafwing_input_manager::prelude::*;
+use leafwing_input_manager::user_input::InputKind;
 use std::f32::consts::PI;
 use turborand::prelude::*;
 
@@ -103,7 +105,10 @@ fn main() {
 
 #[derive(Actionlike, PartialEq, Eq, Clone, Copy, Hash, Debug)]
 pub enum Actions {
-    Move,
+    Rotate,
+    Direction,
+    Throttle,
+    Boost,
     CameraZoom,
 }
 
@@ -234,12 +239,25 @@ fn setup_game(
             commands.entity(scene_root).add_child(camera);
             commands.entity(entity).insert(
                 InputMap::<Actions>::default()
-                    .insert(VirtualDPad::wasd(), Actions::Move)
-                    .insert(VirtualDPad::arrow_keys(), Actions::Move)
-                    .insert(VirtualDPad::mouse_motion(), Actions::Move)
-                    .insert(DualAxis::left_stick(), Actions::Move)
+                    .insert(VirtualDPad::wasd(), Actions::Direction)
+                    .insert(VirtualDPad::arrow_keys(), Actions::Rotate)
+                    .insert(
+                        VirtualDPad {
+                            up: InputKind::MouseMotion(MouseMotionDirection::Down),
+                            down: InputKind::MouseMotion(MouseMotionDirection::Up),
+                            left: InputKind::MouseMotion(MouseMotionDirection::Left),
+                            right: InputKind::MouseMotion(MouseMotionDirection::Right),
+                        },
+                        Actions::Direction,
+                    )
+                    .insert(DualAxis::left_stick(), Actions::Direction)
                     .insert(VirtualDPad::dpad(), Actions::CameraZoom)
                     .insert(VirtualDPad::mouse_wheel(), Actions::CameraZoom)
+                    .insert(KeyCode::Space, Actions::Boost)
+                    .insert(KeyCode::Up, Actions::Boost)
+                    .insert(GamepadButtonType::South, Actions::Boost)
+                    .insert(GamepadButtonType::RightTrigger, Actions::Boost)
+                    .insert(MouseButton::Left, Actions::Boost)
                     .build(),
             );
         }

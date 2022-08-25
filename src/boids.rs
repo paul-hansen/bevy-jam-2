@@ -8,7 +8,7 @@ use leafwing_input_manager::axislike::DualAxisData;
 use leafwing_input_manager::orientation::{Orientation, Rotation};
 use leafwing_input_manager::prelude::*;
 use std::collections::HashMap;
-use std::f32::consts::{FRAC_PI_2, PI};
+use std::f32::consts::FRAC_PI_2;
 use std::mem;
 
 #[derive(Inspectable, Debug)]
@@ -25,7 +25,10 @@ pub struct BoidSettings {
     /// The amount the boid's speed changes by in units per second
     #[inspectable(min = 0.0, max = 9999.0)]
     acceleration: f32,
-    #[inspectable(min = 0.0, max = PI * 180.0)]
+    /// The deceleration applied to the boid every frame in units per second
+    #[inspectable(min = 0.0, max = 9999.0)]
+    drag: f32,
+    #[inspectable(min = 0.0, max = 3600.0)]
     max_turn_rate_per_second: f32,
     #[inspectable(min = 0.0, max = 1000.0)]
     separation_distance: f32,
@@ -42,8 +45,9 @@ impl Default for BoidSettings {
             alignment_enabled: true,
             max_speed: 120.0,
             min_speed: 60.0,
-            acceleration: 200.0,
-            max_turn_rate_per_second: PI * 2.8,
+            acceleration: 300.0,
+            drag: 100.0,
+            max_turn_rate_per_second: 520.0,
             separation_distance: 15.0,
             capture_range: 20.0,
             debug_lines: false,
@@ -232,7 +236,7 @@ pub fn update_boid_transforms(
         }
 
         let forward = transform.up();
-        let mut acceleration_input = 0.0;
+        let mut acceleration = 0.0;
 
         // if headed out of bounds, rotate towards the center
         let direction = -transform.translation.truncate();
@@ -246,19 +250,46 @@ pub fn update_boid_transforms(
         } else {
             add_axis_input(
                 &mut action_state,
-                Actions::Move,
-                DualAxisData::new(-inputs.turn_average(), inputs.speed_average()),
+                Actions::Rotate,
+                DualAxisData::new(-inputs.turn_average(), 0.0),
+            );
+            add_axis_input(
+                &mut action_state,
+                Actions::Throttle,
+                DualAxisData::new(0.0, inputs.speed_average()),
             );
 
-            if let Some(axis_data) = action_state.clamped_axis_pair(Actions::Move) {
+            if let Some(axis_data) = action_state.clamped_axis_pair(Actions::Rotate) {
                 transform.rotate_z(
-                    -axis_data.x() * boid_settings.max_turn_rate_per_second * time.delta_seconds(),
+                    -axis_data.x()
+                        * boid_settings.max_turn_rate_per_second.to_radians()
+                        * time.delta_seconds(),
                 );
-                acceleration_input = axis_data.y();
+            }
+
+            if let Some(axis_data) = action_state.clamped_axis_pair(Actions::Throttle) {
+                if axis_data.length_squared() > 0.01 {
+                    acceleration += boid_settings.acceleration * axis_data.y();
+                }
+            }
+
+            if let Some(axis_data) = action_state.clamped_axis_pair(Actions::Direction) {
+                if axis_data.length_squared() > 0.01 {
+                    transform.rotation.rotate_towards(
+                        Quat::from_rotation_z((-axis_data.x()).atan2(axis_data.y())),
+                        Some(Rotation::from_degrees(
+                            boid_settings.max_turn_rate_per_second * time.delta_seconds(),
+                        )),
+                    );
+                }
             }
         }
 
-        velocity.forward += boid_settings.acceleration * acceleration_input * time.delta_seconds();
+        if action_state.pressed(Actions::Boost) {
+            velocity.forward += boid_settings.acceleration;
+        }
+
+        velocity.forward += (acceleration - boid_settings.drag) * time.delta_seconds();
         velocity.forward = velocity
             .forward
             .clamp(boid_settings.min_speed, boid_settings.max_speed);
@@ -269,7 +300,7 @@ pub fn update_boid_transforms(
 pub fn clear_inputs(mut query: Query<(&mut BoidAveragedInputs, &mut ActionState<Actions>)>) {
     for (mut inputs, mut action_state) in query.iter_mut() {
         inputs.reset();
-        action_state.set_action_data(Actions::Move, ActionData::default());
+        action_state.set_action_data(Actions::Rotate, ActionData::default());
     }
 }
 

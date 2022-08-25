@@ -92,20 +92,28 @@ pub fn unlock_mouse(mut windows: ResMut<Windows>) {
 pub fn toggle_boid_settings(
     mut inspector_windows: ResMut<InspectorWindows>,
     action_state: Query<&ActionState<GlobalActions>>,
+    mut windows: ResMut<Windows>,
 ) {
     let action_state = action_state.single();
     if action_state.just_released(GlobalActions::ToggleBoidSettings) {
         let inspector_window_data = inspector_windows.window_data_mut::<BoidSettings>();
         inspector_window_data.visible = !inspector_window_data.visible;
+        let window = windows.get_primary_mut().unwrap();
+        window.set_cursor_lock_mode(!inspector_window_data.visible);
+        window.set_cursor_visibility(inspector_window_data.visible);
     }
 }
 
 pub fn toggle_world_inspector(
     action_state: Query<&ActionState<GlobalActions>>,
     mut world_inspector_params: ResMut<WorldInspectorParams>,
+    mut windows: ResMut<Windows>,
 ) {
     let action_state = action_state.single();
     if action_state.just_released(GlobalActions::ToggleWorldInspector) {
         world_inspector_params.enabled = !world_inspector_params.enabled;
+        let window = windows.get_primary_mut().unwrap();
+        window.set_cursor_lock_mode(!world_inspector_params.enabled);
+        window.set_cursor_visibility(world_inspector_params.enabled);
     }
 }
