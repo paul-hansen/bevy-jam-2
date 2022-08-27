@@ -1,17 +1,16 @@
+mod ai;
 mod boids;
 mod camera;
 mod math;
 mod ui;
 
 use crate::boids::{
-    calculate_alignment_inputs, calculate_cohesion_inputs, calculate_separation_inputs,
     clear_inputs, leader_defeated, leader_removed, propagate_boid_color, update_boid_color,
     update_boid_neighbors, update_boid_transforms, Boid, BoidAveragedInputs, BoidColor,
     BoidNeighborsCaptureRange, BoidNeighborsSeparation, BoidSettings, GameEvent, Leader, Velocity,
 };
 use crate::camera::{camera_zoom, update_camera_follow_system, Camera2dFollow};
 use crate::math::how_much_right_or_left;
-use crate::ui::UiAppPlugin;
 use bevy::asset::AssetServerSettings;
 use bevy::prelude::*;
 use bevy::render::camera::ScalingMode;
@@ -66,26 +65,20 @@ fn main() {
     .add_plugin(DebugLinesPlugin::default())
     .add_plugin(InputManagerPlugin::<Actions>::default())
     .add_plugin(InputManagerPlugin::<GlobalActions>::default())
-    .add_plugin(UiAppPlugin)
+    .add_plugin(ui::UiAppPlugin)
+    .add_plugin(ai::AiAppPlugin)
     .add_plugin(KbgpPlugin)
     .register_inspectable::<BoidNeighborsCaptureRange>()
     .register_inspectable::<BoidNeighborsSeparation>()
     .register_inspectable::<Camera2dFollow>()
+    .register_inspectable::<BoidColor>()
+    .register_inspectable::<Velocity>()
     .register_type::<BoidAveragedInputs>()
     .add_state::<AppState>(AppState::Intro)
     .add_event::<GameEvent>()
     .add_startup_system(setup)
     .add_system_set(SystemSet::on_enter(AppState::Setup).with_system(setup_game))
     .add_system_to_stage(CoreStage::First, update_boid_neighbors)
-    .add_system_to_stage(CoreStage::PreUpdate, calculate_cohesion_inputs)
-    .add_system_to_stage(
-        CoreStage::PreUpdate,
-        calculate_separation_inputs.after(calculate_cohesion_inputs),
-    )
-    .add_system_to_stage(
-        CoreStage::PreUpdate,
-        calculate_alignment_inputs.after(calculate_separation_inputs),
-    )
     .add_system_set(SystemSet::on_update(AppState::Playing).with_system(update_boid_transforms))
     .add_system_to_stage(CoreStage::Last, clear_inputs)
     .add_system(update_boid_color)
@@ -148,6 +141,7 @@ fn setup(
             input_map: {
                 InputMap::<GlobalActions>::default()
                     .insert(KeyCode::Escape, GlobalActions::ToggleMenu)
+                    .insert(MouseButton::Right, GlobalActions::ToggleMenu)
                     .insert(GamepadButtonType::East, GlobalActions::ToggleMenu)
                     .insert(GamepadButtonType::Select, GlobalActions::ToggleMenu)
                     .insert(GamepadButtonType::Start, GlobalActions::ToggleMenu)

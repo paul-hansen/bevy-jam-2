@@ -1,6 +1,4 @@
-use crate::{
-    how_much_right_or_left, Actions, AppState, Winner, ARENA_PADDING, ARENA_RADIUS, BOID_SCALE,
-};
+use crate::{Actions, AppState, Winner, ARENA_PADDING, ARENA_RADIUS, BOID_SCALE};
 use bevy::prelude::*;
 use bevy_inspector_egui::egui::Ui;
 use bevy_inspector_egui::{Context, Inspectable};
@@ -16,28 +14,28 @@ use std::mem;
 
 #[derive(Inspectable, Debug)]
 pub struct BoidSettings {
-    cohesion_enabled: bool,
-    separation_enabled: bool,
-    alignment_enabled: bool,
+    pub cohesion_enabled: bool,
+    pub separation_enabled: bool,
+    pub alignment_enabled: bool,
     /// The maximum speed the boid is allowed to go in units per second
     #[inspectable(min = 0.0, max = 9999.0)]
-    max_speed: f32,
+    pub max_speed: f32,
     /// The minimum speed the boid is allowed to go in units per second
     #[inspectable(min = 0.0, max = 9999.0)]
-    min_speed: f32,
+    pub min_speed: f32,
     /// The amount the boid's speed changes by in units per second
     #[inspectable(min = 0.0, max = 9999.0)]
-    acceleration: f32,
+    pub acceleration: f32,
     /// The deceleration applied to the boid every frame in units per second
     #[inspectable(min = 0.0, max = 9999.0)]
-    drag: f32,
+    pub drag: f32,
     #[inspectable(min = 0.0, max = 3600.0)]
-    max_turn_rate_per_second: f32,
+    pub max_turn_rate_per_second: f32,
     #[inspectable(min = 0.0, max = 1000.0)]
-    separation_distance: f32,
+    pub separation_distance: f32,
     #[inspectable(min = 0.0, max = 1000.0)]
-    capture_range: f32,
-    debug_lines: bool,
+    pub capture_range: f32,
+    pub debug_lines: bool,
 }
 
 impl Default for BoidSettings {
@@ -61,9 +59,9 @@ impl Default for BoidSettings {
 #[derive(Component, Default)]
 pub struct Boid {}
 
-#[derive(Component, Default, Debug)]
+#[derive(Component, Default, Debug, Inspectable)]
 pub struct Velocity {
-    forward: f32,
+    pub forward: f32,
 }
 
 #[derive(Component, Default)]
@@ -82,7 +80,7 @@ impl Inspectable for BoidNeighborsCaptureRange {
 
 #[derive(Component, Default, Reflect)]
 pub struct BoidNeighborsSeparation {
-    entities: Vec<Entity>,
+    pub entities: Vec<Entity>,
 }
 
 impl Inspectable for BoidNeighborsSeparation {
@@ -185,7 +183,7 @@ pub fn update_boid_neighbors(
     }
 }
 
-#[derive(Component, Eq, PartialEq, Copy, Clone, Debug, Hash)]
+#[derive(Component, Eq, PartialEq, Copy, Clone, Debug, Hash, Inspectable)]
 pub enum BoidColor {
     Red,
     Green,
@@ -317,124 +315,6 @@ pub fn clear_inputs(mut query: Query<(&mut BoidAveragedInputs, &mut ActionState<
         inputs.reset();
         action_state.set_action_data(Actions::Rotate, ActionData::default());
         action_state.set_action_data(Actions::Boost, ActionData::default());
-    }
-}
-
-#[allow(clippy::type_complexity)]
-pub fn calculate_cohesion_inputs(
-    mut query: Query<
-        (&Transform, &mut BoidAveragedInputs, &BoidColor, &Velocity),
-        (With<Boid>, Without<Leader>),
-    >,
-    leader_query: Query<(&Transform, &BoidColor, &Velocity), With<Leader>>,
-    mut lines: ResMut<DebugLines>,
-    boid_settings: Res<BoidSettings>,
-) {
-    if !boid_settings.cohesion_enabled {
-        return;
-    }
-    // Turn and move towards the leader's position if they have one.
-    for (transform, mut inputs, color, velocity) in query.iter_mut() {
-        if let Some((leader_transform, _, leader_velocity)) =
-            leader_query.iter().find(|(_, c, _)| *c == color)
-        {
-            let leader_position = leader_transform.translation.truncate();
-
-            let direction_to_target =
-                (leader_position - transform.translation.truncate()).normalize();
-
-            let turn_towards_leader_direction = -how_much_right_or_left(
-                transform,
-                &(transform.translation.truncate() + direction_to_target),
-            );
-            let speed_up_down = match leader_velocity.forward - velocity.forward {
-                x if x > 120.0 => 1.0,
-                x if x > 0.0 => 0.5,
-                x if x < -3.0 => -1.0,
-                _ => 0.0,
-            };
-            if boid_settings.debug_lines {
-                lines.line_gradient(
-                    transform.translation,
-                    (direction_to_target.extend(0.0) * 20.0) + transform.translation,
-                    0.0,
-                    Color::rgba(0.2, 1.0, 0.2, 1.0),
-                    Color::rgba(0.2, 1.0, 0.2, 0.0),
-                );
-            }
-
-            inputs.add_turn(turn_towards_leader_direction);
-            inputs.add_speed(speed_up_down);
-        }
-    }
-}
-
-#[allow(clippy::type_complexity)]
-pub fn calculate_separation_inputs(
-    mut query: Query<
-        (
-            &Transform,
-            &BoidNeighborsSeparation,
-            &mut BoidAveragedInputs,
-        ),
-        (With<Boid>, Without<InputMap<Actions>>),
-    >,
-    transforms: Query<&Transform>,
-    mut lines: ResMut<DebugLines>,
-    boid_settings: Res<BoidSettings>,
-) {
-    if !boid_settings.separation_enabled {
-        return;
-    }
-    for (transform, neighbors, mut inputs) in query.iter_mut() {
-        transforms
-            .iter_many(&neighbors.entities)
-            .for_each(|target| {
-                let direction = how_much_right_or_left(transform, &target.translation.truncate());
-                if boid_settings.debug_lines {
-                    lines.line_gradient(
-                        transform.translation,
-                        ((target.translation - transform.translation) * 0.5)
-                            + transform.translation,
-                        0.0,
-                        Color::rgba(1.0, 0.0, 0.0, (direction + 1.0) / 2.0),
-                        Color::rgba(1.0, 0.0, 0.0, 0.2),
-                    );
-                }
-                inputs.add_turn(direction);
-            });
-    }
-}
-
-#[allow(clippy::type_complexity)]
-pub fn calculate_alignment_inputs(
-    mut query: Query<
-        (&Transform, &mut BoidAveragedInputs, &BoidColor),
-        (With<Boid>, Without<InputMap<Actions>>),
-    >,
-    leader_query: Query<(&Transform, &BoidColor), With<Leader>>,
-    mut lines: ResMut<DebugLines>,
-    boid_settings: Res<BoidSettings>,
-) {
-    if !boid_settings.alignment_enabled {
-        return;
-    }
-    for (transform, mut inputs, color) in query.iter_mut() {
-        if let Some((leader_transform, _)) = leader_query.iter().find(|(_, c)| *c == color) {
-            let average = leader_transform.up().truncate();
-            if boid_settings.debug_lines {
-                lines.line_colored(
-                    transform.translation,
-                    transform.translation + (average.extend(0.0) * 20.0),
-                    0.0,
-                    Color::VIOLET,
-                );
-            }
-            inputs.add_turn(-how_much_right_or_left(
-                &Transform::from_rotation(transform.rotation),
-                &average,
-            ));
-        }
     }
 }
 
