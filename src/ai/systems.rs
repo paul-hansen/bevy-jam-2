@@ -28,7 +28,7 @@ pub fn calculate_cohesion_inputs(
             let direction_to_target =
                 (leader_position - transform.translation.truncate()).normalize();
 
-            let turn_towards_leader_direction = -how_much_right_or_left(
+            let turn_towards_leader_direction = how_much_right_or_left(
                 transform,
                 &(transform.translation.truncate() + direction_to_target),
             );
@@ -86,7 +86,8 @@ pub fn calculate_separation_inputs(
                         Color::rgba(1.0, 0.0, 0.0, 0.2),
                     );
                 }
-                inputs.add_turn(direction);
+                // Turn away from neighbors within separation distance
+                inputs.add_turn(-direction);
             });
     }
 }
@@ -115,7 +116,7 @@ pub fn calculate_alignment_inputs(
                     Color::VIOLET,
                 );
             }
-            inputs.add_turn(-how_much_right_or_left(
+            inputs.add_turn(how_much_right_or_left(
                 &Transform::from_rotation(transform.rotation),
                 &average,
             ));

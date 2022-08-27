@@ -265,7 +265,7 @@ pub fn update_boid_transforms(
             add_axis_input(
                 &mut action_state,
                 Actions::Rotate,
-                DualAxisData::new(-inputs.turn_average(), 0.0),
+                DualAxisData::new(inputs.turn_average(), 0.0),
             );
             add_axis_input(
                 &mut action_state,
