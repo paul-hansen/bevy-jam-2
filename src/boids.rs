@@ -304,9 +304,12 @@ pub fn update_boid_transforms(
         }
 
         velocity.forward += (acceleration - boid_settings.drag) * time.delta_seconds();
-        velocity.forward = velocity
-            .forward
-            .clamp(boid_settings.min_speed, boid_settings.max_speed);
+        velocity.forward = velocity.forward.clamp(
+            // clamp requires that min <= to max, adding the extra min here so it
+            // doesn't panic if max_speed is set to lower than min_speed via the inspector.
+            boid_settings.min_speed.min(boid_settings.max_speed),
+            boid_settings.max_speed,
+        );
         transform.translation += forward * time.delta_seconds() * velocity.forward;
     }
 }
