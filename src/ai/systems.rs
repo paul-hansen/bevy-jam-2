@@ -1,3 +1,4 @@
+use crate::math::direction_to_turn_away_from_target;
 use crate::{
     how_much_right_or_left, Boid, BoidAveragedInputs, BoidColor, BoidNeighborsSeparation,
     BoidSettings, Leader, Velocity,
@@ -30,7 +31,7 @@ pub fn calculate_cohesion_inputs(
 
             let turn_towards_leader_direction = how_much_right_or_left(
                 transform,
-                &(transform.translation.truncate() + direction_to_target),
+                transform.translation.truncate() + direction_to_target,
             );
             let speed_up_down = match leader_velocity.forward - velocity.forward {
                 x if x > 120.0 => 1.0,
@@ -75,7 +76,16 @@ pub fn calculate_separation_inputs(
         transforms
             .iter_many(&neighbors.entities)
             .for_each(|target| {
-                let direction = how_much_right_or_left(transform, &target.translation.truncate());
+                let direction =
+                    (direction_to_turn_away_from_target(transform, target.translation.truncate())
+                        * 2.0)
+                        .clamp(-1.0, 1.0);
+                // Turn away from neighbors within separation distance
+                inputs.add_turn(direction);
+
+                // Draw a line from the current entity to the target that is affecting the separation
+                // Fades out farther from the current entity so it's easy to tell if both
+                // entities are being affected.
                 if boid_settings.debug_lines {
                     lines.line_gradient(
                         transform.translation,
@@ -86,8 +96,6 @@ pub fn calculate_separation_inputs(
                         Color::rgba(1.0, 0.0, 0.0, 0.2),
                     );
                 }
-                // Turn away from neighbors within separation distance
-                inputs.add_turn(-direction);
             });
     }
 }
@@ -118,7 +126,7 @@ pub fn calculate_alignment_inputs(
             }
             inputs.add_turn(how_much_right_or_left(
                 &Transform::from_rotation(transform.rotation),
-                &average,
+                average,
             ));
         }
     }

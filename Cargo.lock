@@ -253,6 +253,7 @@ dependencies = [
 name = "bevy-jam-2"
 version = "0.3.0"
 dependencies = [
+ "approx",
  "bevy",
  "bevy-egui-kbgp",
  "bevy-inspector-egui",
