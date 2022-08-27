@@ -316,6 +316,7 @@ pub fn clear_inputs(mut query: Query<(&mut BoidAveragedInputs, &mut ActionState<
     for (mut inputs, mut action_state) in query.iter_mut() {
         inputs.reset();
         action_state.set_action_data(Actions::Rotate, ActionData::default());
+        action_state.set_action_data(Actions::Boost, ActionData::default());
     }
 }
 
