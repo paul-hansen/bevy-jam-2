@@ -1,4 +1,5 @@
 use crate::{Actions, AppState, Winner, ARENA_PADDING, ARENA_RADIUS, BOID_SCALE};
+use bevy::ecs::schedule::StateError;
 use bevy::prelude::*;
 use bevy_inspector_egui::egui::Ui;
 use bevy_inspector_egui::{Context, Inspectable};
@@ -406,8 +407,14 @@ pub fn leader_defeated(
             }
             GameEvent::GameOver(winner) => {
                 commands.insert_resource(winner.clone());
-                if let Err(e) = app_state.replace(AppState::GameOver) {
-                    error!("Failed to change app state to game over: {e}");
+                if let Err(e) = app_state.push(AppState::GameOver) {
+                    match e {
+                        StateError::AlreadyInState => {}
+                        StateError::StateAlreadyQueued => {}
+                        StateError::StackEmpty => {
+                            error!("Failed to change app state to game over: {e}")
+                        }
+                    }
                 };
             }
         }

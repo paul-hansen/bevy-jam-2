@@ -12,6 +12,7 @@ use crate::boids::{
 use crate::camera::{camera_zoom, update_camera_follow_system, Camera2dFollow};
 use crate::math::how_much_right_or_left;
 use bevy::asset::AssetServerSettings;
+use bevy::ecs::schedule::ShouldRun;
 use bevy::prelude::*;
 use bevy::render::camera::ScalingMode;
 use bevy::window::WindowMode;
@@ -85,7 +86,12 @@ fn main() {
     .add_system(update_camera_follow_system)
     .add_system(camera_zoom)
     .add_system(leader_defeated)
-    .add_system_to_stage(CoreStage::PreUpdate, propagate_boid_color)
+    .add_system_set_to_stage(
+        CoreStage::PreUpdate,
+        SystemSet::new()
+            .with_run_criteria(run_if_playing)
+            .with_system(propagate_boid_color),
+    )
     .add_system_to_stage(CoreStage::PostUpdate, leader_removed);
 
     // Might disable this for release builds in the future
@@ -299,4 +305,12 @@ fn setup_game(
     } else {
         info!("App state transitioned to Playing")
     };
+}
+
+fn run_if_playing(app_state: Res<bevy::prelude::State<AppState>>) -> ShouldRun {
+    if *app_state.current() == AppState::Playing {
+        ShouldRun::Yes
+    } else {
+        ShouldRun::No
+    }
 }
