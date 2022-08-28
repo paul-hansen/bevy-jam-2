@@ -1,4 +1,6 @@
-use crate::{Actions, AppState, Winner, ARENA_PADDING, ARENA_RADIUS, BOID_SCALE};
+use crate::{
+    AppState, PlayerActions, Winner, ARENA_PADDING, ARENA_RADIUS, BOID_SCALE, LEADER_SCALE,
+};
 use bevy::ecs::schedule::StateError;
 use bevy::prelude::*;
 use bevy_inspector_egui::egui::Ui;
@@ -36,6 +38,8 @@ pub struct BoidSettings {
     pub separation_distance: f32,
     #[inspectable(min = 0.0, max = 1000.0)]
     pub capture_range: f32,
+    #[inspectable(min = 0.0, max = 1000.0)]
+    pub vision_range: f32,
     pub debug_lines: bool,
 }
 
@@ -52,6 +56,7 @@ impl Default for BoidSettings {
             max_turn_rate_per_second: 520.0,
             separation_distance: 15.0,
             capture_range: 20.0,
+            vision_range: 500.0,
             debug_lines: false,
         }
     }
@@ -229,7 +234,7 @@ pub fn update_boid_transforms(
     mut boid_query: Query<
         (
             &mut Transform,
-            &mut ActionState<Actions>,
+            &mut ActionState<PlayerActions>,
             &BoidAveragedInputs,
             &mut Velocity,
         ),
@@ -264,16 +269,16 @@ pub fn update_boid_transforms(
         } else {
             add_axis_input(
                 &mut action_state,
-                Actions::Rotate,
+                PlayerActions::Rotate,
                 DualAxisData::new(inputs.turn_average(), 0.0),
             );
             add_axis_input(
                 &mut action_state,
-                Actions::Throttle,
+                PlayerActions::Throttle,
                 DualAxisData::new(0.0, inputs.speed_average()),
             );
 
-            if let Some(axis_data) = action_state.clamped_axis_pair(Actions::Rotate) {
+            if let Some(axis_data) = action_state.clamped_axis_pair(PlayerActions::Rotate) {
                 transform.rotate_z(
                     -axis_data.x()
                         * boid_settings.max_turn_rate_per_second.to_radians()
@@ -281,13 +286,13 @@ pub fn update_boid_transforms(
                 );
             }
 
-            if let Some(axis_data) = action_state.clamped_axis_pair(Actions::Throttle) {
+            if let Some(axis_data) = action_state.clamped_axis_pair(PlayerActions::Throttle) {
                 if axis_data.length_squared() > 0.01 {
                     acceleration += boid_settings.acceleration * axis_data.y();
                 }
             }
 
-            if let Some(axis_data) = action_state.clamped_axis_pair(Actions::Direction) {
+            if let Some(axis_data) = action_state.clamped_axis_pair(PlayerActions::Direction) {
                 if axis_data.length_squared() > 0.01 {
                     transform.rotation.rotate_towards(
                         Quat::from_rotation_z((-axis_data.x()).atan2(axis_data.y())),
@@ -299,7 +304,7 @@ pub fn update_boid_transforms(
             }
         }
 
-        if action_state.pressed(Actions::Boost) {
+        if action_state.pressed(PlayerActions::Boost) {
             velocity.forward += boid_settings.acceleration;
         }
 
@@ -314,11 +319,11 @@ pub fn update_boid_transforms(
     }
 }
 
-pub fn clear_inputs(mut query: Query<(&mut BoidAveragedInputs, &mut ActionState<Actions>)>) {
+pub fn clear_inputs(mut query: Query<(&mut BoidAveragedInputs, &mut ActionState<PlayerActions>)>) {
     for (mut inputs, mut action_state) in query.iter_mut() {
         inputs.reset();
-        action_state.set_action_data(Actions::Rotate, ActionData::default());
-        action_state.set_action_data(Actions::Boost, ActionData::default());
+        action_state.set_action_data(PlayerActions::Rotate, ActionData::default());
+        action_state.set_action_data(PlayerActions::Boost, ActionData::default());
     }
 }
 
@@ -387,6 +392,12 @@ pub fn leader_removed(removals: RemovedComponents<Leader>, mut query: Query<&mut
     }
 }
 
+pub fn leader_added(mut query: Query<&mut Transform, Added<Leader>>) {
+    for mut transform in query.iter_mut() {
+        transform.scale = LEADER_SCALE;
+    }
+}
+
 pub fn leader_defeated(
     mut commands: Commands,
     mut event_reader: EventReader<GameEvent>,
@@ -403,7 +414,7 @@ pub fn leader_defeated(
                         commands
                             .entity(entity)
                             .remove::<Leader>()
-                            .remove::<InputMap<Actions>>()
+                            .remove::<InputMap<PlayerActions>>()
                             .remove::<BoidColor>();
                     }
                 }
@@ -425,8 +436,8 @@ pub fn leader_defeated(
 }
 
 fn add_axis_input(
-    action_state: &mut ActionState<Actions>,
-    action: Actions,
+    action_state: &mut ActionState<PlayerActions>,
+    action: PlayerActions,
     axis_data: DualAxisData,
 ) {
     let mut data = action_state.action_data(action);

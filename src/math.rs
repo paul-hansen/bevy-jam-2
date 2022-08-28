@@ -17,6 +17,20 @@ pub fn how_much_right_or_left(transform: &Transform, target: Vec2) -> f32 {
 /// Returns a value between -1.0 and 1.0 based on which direction the transform must turn to turn
 /// towards the target.
 ///
+/// A value of 1.0 or -1.0 means the target is directly behind.
+///
+/// A value of 0.0 means the target is directly in front.
+///
+/// A value of 0.5 means the target is directly to the right.
+pub fn direction_to_turn_towards_target(transform: &Transform, target: Vec2) -> f32 {
+    let angle_to_target = vec2_to_angle(target - transform.translation.truncate());
+    let transform_z_angle = vec2_to_angle(transform.up().truncate());
+    -angle_to(transform_z_angle, angle_to_target) / PI
+}
+
+/// Returns a value between -1.0 and 1.0 based on which direction the transform must turn to turn
+/// towards the target.
+///
 /// A value of 1.0 or -1.0 means the target is directly in front.
 ///
 /// A value of 0.0 means the target is directly behind.

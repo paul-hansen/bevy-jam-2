@@ -1,4 +1,4 @@
-use crate::{Actions, Camera2d, Query, ScalingMode};
+use crate::{Camera2d, PlayerActions, Query, ScalingMode};
 use bevy::math::Vec2Swizzles;
 use bevy::prelude::*;
 use bevy_inspector_egui::Inspectable;
@@ -27,13 +27,13 @@ pub struct Camera2dFollow {
 
 pub fn camera_zoom(
     mut query: Query<(&Camera2dFollow, &mut OrthographicProjection)>,
-    player_query: Query<(Entity, &ActionState<Actions>)>,
+    player_query: Query<(Entity, &ActionState<PlayerActions>)>,
     time: Res<Time>,
 ) {
     for (entity, action_state) in player_query.iter() {
-        let amount = match action_state.just_pressed(Actions::CameraZoom) {
+        let amount = match action_state.just_pressed(PlayerActions::CameraZoom) {
             true => 50.0,
-            false => match action_state.current_duration(Actions::CameraZoom)
+            false => match action_state.current_duration(PlayerActions::CameraZoom)
                 > Duration::from_secs_f32(0.25)
             {
                 true => 320.0 * time.delta_seconds(),
@@ -43,7 +43,9 @@ pub fn camera_zoom(
         for (camera_follow, mut projection) in query.iter_mut() {
             if camera_follow.target == entity {
                 if let ScalingMode::FixedVertical(x) = projection.scaling_mode {
-                    if let Some(axis_pair) = action_state.clamped_axis_pair(Actions::CameraZoom) {
+                    if let Some(axis_pair) =
+                        action_state.clamped_axis_pair(PlayerActions::CameraZoom)
+                    {
                         projection.scaling_mode = ScalingMode::FixedVertical(
                             (x - axis_pair.y() * amount).clamp(200.0, 1200.0),
                         );
