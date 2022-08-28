@@ -8,7 +8,7 @@ use leafwing_input_manager::user_input::InputKind;
 pub enum PlayerType {
     AnyDevice,
     Wasd,
-    Arrowkeys,
+    ArrowKeys,
     Mouse,
     GamePad(Option<Gamepad>),
     Bot(Bot),
@@ -25,7 +25,7 @@ impl PlayerType {
                 PlayerType::Wasd
                     .input_map()
                     .unwrap()
-                    .merge(&PlayerType::Arrowkeys.input_map().unwrap())
+                    .merge(&PlayerType::ArrowKeys.input_map().unwrap())
                     .merge(&PlayerType::Mouse.input_map().unwrap())
                     .merge(&PlayerType::GamePad(None).input_map().unwrap())
                     .build(),
@@ -55,7 +55,7 @@ impl PlayerType {
                     .insert(KeyCode::LShift, PlayerActions::Boost)
                     .build(),
             ),
-            PlayerType::Arrowkeys => Some(
+            PlayerType::ArrowKeys => Some(
                 InputMap::<PlayerActions>::default()
                     .insert(VirtualDPad::arrow_keys(), PlayerActions::Rotate)
                     .insert(
