@@ -1,5 +1,5 @@
 use crate::{
-    AppState, PlayerActions, Winner, ARENA_PADDING, ARENA_RADIUS, BOID_SCALE, LEADER_SCALE,
+    AppState, PlayerActions, RoundSettings, Winner, ARENA_PADDING, BOID_SCALE, LEADER_SCALE,
 };
 use bevy::ecs::schedule::StateError;
 use bevy::prelude::*;
@@ -243,6 +243,7 @@ pub fn update_boid_transforms(
     time: Res<Time>,
     mut lines: ResMut<DebugLines>,
     boid_settings: Res<BoidSettings>,
+    round_settings: Res<RoundSettings>,
 ) {
     for (mut transform, mut action_state, inputs, mut velocity) in boid_query.iter_mut() {
         if boid_settings.debug_lines {
@@ -259,7 +260,7 @@ pub fn update_boid_transforms(
 
         // if headed out of bounds, rotate towards the center
         let direction = -transform.translation.truncate();
-        if direction.length_squared() > (ARENA_RADIUS - ARENA_PADDING).powf(2.) {
+        if direction.length_squared() > (round_settings.arena_radius - ARENA_PADDING).powf(2.) {
             let angle = direction.y.atan2(direction.x) - FRAC_PI_2;
 
             transform.rotation.rotate_towards(

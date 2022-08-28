@@ -31,7 +31,6 @@ use turborand::prelude::*;
 
 const SCENE_HEIGHT: f32 = 500.0;
 const BOID_COUNT: usize = 400;
-const ARENA_RADIUS: f32 = 1200.0;
 const ARENA_PADDING: f32 = 100.0;
 const BOID_SCALE: Vec3 = Vec3::splat(0.01);
 const LEADER_SCALE: Vec3 = Vec3::splat(0.014);
@@ -141,6 +140,7 @@ fn setup(
     mut materials: ResMut<Assets<ColorMaterial>>,
     mut inspector_windows: ResMut<InspectorWindows>,
     asset_server: ResMut<AssetServer>,
+    round_settings: Res<RoundSettings>,
 ) {
     commands
         .spawn_bundle(SpriteBundle {
@@ -155,7 +155,9 @@ fn setup(
     inspector_window_data.visible = false;
     commands.spawn_bundle(ColorMesh2dBundle {
         mesh: meshes
-            .add(Mesh::from(shape::Circle::new(ARENA_RADIUS + 2.0)))
+            .add(Mesh::from(shape::Circle::new(
+                round_settings.arena_radius + 2.0,
+            )))
             .into(),
         material: materials.add(ColorMaterial::from(Color::WHITE)),
         ..default()
@@ -163,7 +165,7 @@ fn setup(
     commands
         .spawn_bundle(ColorMesh2dBundle {
             mesh: meshes
-                .add(Mesh::from(shape::Circle::new(ARENA_RADIUS)))
+                .add(Mesh::from(shape::Circle::new(round_settings.arena_radius)))
                 .into(),
             material: materials.add(ColorMaterial::from(asset_server.load("waves.png"))),
             transform: Transform::from_xyz(0.0, 0.0, 0.01),
@@ -227,8 +229,7 @@ fn setup_game(
     mut commands: Commands,
     asset_server: ResMut<AssetServer>,
     mut app_state: ResMut<bevy::prelude::State<AppState>>,
-
-    match_settings: Res<RoundSettings>,
+    round_settings: Res<RoundSettings>,
 ) {
     // Spawn a root node to attach everything to so we can recursively delete everything
     // when reloading.
@@ -242,7 +243,7 @@ fn setup_game(
 
     let rand = Rng::new();
     for x in 0..BOID_COUNT {
-        let r = (ARENA_RADIUS - ARENA_PADDING) * rand.f32();
+        let r = (round_settings.arena_radius - ARENA_PADDING) * rand.f32();
         let theta = rand.f32() * 2.0 * PI;
         let entity = commands
             .spawn_bundle(SpriteBundle {
@@ -261,8 +262,8 @@ fn setup_game(
             .insert(Velocity::default())
             .id();
 
-        if x < match_settings.players.len() {
-            let player_settings = &match_settings.players[x];
+        if x < round_settings.players.len() {
+            let player_settings = &round_settings.players[x];
             commands
                 .entity(entity)
                 .insert(player_settings.color)

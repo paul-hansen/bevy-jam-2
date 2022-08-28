@@ -105,6 +105,8 @@ pub struct PlayerSettings {
 
 pub struct RoundSettings {
     pub players: Vec<PlayerSettings>,
+    pub arena_radius: f32,
+    pub boid_count: f32,
 }
 
 impl Default for RoundSettings {
@@ -144,6 +146,8 @@ impl Default for RoundSettings {
                     color: BoidColor::Cyan,
                 },
             ],
+            arena_radius: 1200.0,
+            boid_count: 400.0,
         }
     }
 }
