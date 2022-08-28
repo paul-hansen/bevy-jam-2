@@ -1,4 +1,5 @@
 use crate::ui::style::get_style;
+use crate::ui::Logo;
 use crate::{AppState, BoidSettings, GlobalActions, Winner};
 use bevy::app::AppExit;
 use bevy::prelude::*;
@@ -48,6 +49,44 @@ pub fn draw_pause_menu(
                 };
             });
         });
+}
+
+pub fn draw_title(
+    mut egui_context: ResMut<EguiContext>,
+    mut exit: EventWriter<AppExit>,
+    mut app_state: ResMut<State<AppState>>,
+) {
+    egui::Window::new("Flock Fusion")
+        .title_bar(false)
+        .anchor(Align2::CENTER_CENTER, vec2(0.0, 120.0))
+        .resizable(false)
+        .collapsible(false)
+        .show(egui_context.ctx_mut(), |ui| {
+            ui.set_width(200.0);
+            ui.vertical_centered_justified(|ui| {
+                if ui
+                    .button("Start game")
+                    .kbgp_navigation()
+                    .kbgp_initial_focus()
+                    .clicked()
+                {
+                    if let Err(e) = app_state.set(AppState::Setup) {
+                        error!("Error when restarting game: {e}");
+                    };
+                }
+                if ui.button("Exit Game").kbgp_navigation().clicked() {
+                    exit.send(AppExit);
+                };
+            });
+        });
+}
+
+pub fn on_title_enter(mut query: Query<&mut Visibility, With<Logo>>) {
+    query.single_mut().is_visible = true;
+}
+
+pub fn on_title_exit(mut query: Query<&mut Visibility, With<Logo>>) {
+    query.single_mut().is_visible = false;
 }
 
 pub fn draw_game_over(

@@ -13,6 +13,7 @@ use crate::boids::{
 };
 use crate::camera::{camera_zoom, update_camera_follow_system, Camera2dFollow};
 use crate::math::how_much_right_or_left;
+use crate::ui::Logo;
 use bevy::asset::AssetServerSettings;
 use bevy::ecs::schedule::ShouldRun;
 use bevy::prelude::*;
@@ -37,7 +38,7 @@ const LEADER_SCALE: Vec3 = Vec3::splat(0.014);
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum AppState {
-    Intro,
+    Title,
     Setup,
     PauseMenu,
     GameOver,
@@ -222,7 +223,7 @@ fn main() {
     .register_inspectable::<BoidColor>()
     .register_inspectable::<Velocity>()
     .register_type::<BoidAveragedInputs>()
-    .add_state::<AppState>(AppState::Intro)
+    .add_state::<AppState>(AppState::Title)
     .add_event::<GameEvent>()
     .add_startup_system(setup)
     .add_system_set(SystemSet::on_enter(AppState::Setup).with_system(setup_game))
@@ -278,9 +279,17 @@ fn setup(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
     mut inspector_windows: ResMut<InspectorWindows>,
-    mut app_state: ResMut<bevy::prelude::State<AppState>>,
     asset_server: ResMut<AssetServer>,
 ) {
+    commands
+        .spawn_bundle(SpriteBundle {
+            texture: asset_server.load("title.png"),
+            transform: Transform::from_xyz(0.0, 100.0, 5.0).with_scale(Vec3::splat(0.3)),
+            visibility: Visibility { is_visible: false },
+            ..default()
+        })
+        .insert(Logo)
+        .insert(Name::new("Logo"));
     let inspector_window_data = inspector_windows.window_data_mut::<BoidSettings>();
     inspector_window_data.visible = false;
     commands.spawn_bundle(ColorMesh2dBundle {
@@ -328,11 +337,17 @@ fn setup(
             },
         });
 
-    if let Err(e) = app_state.overwrite_set(AppState::Setup) {
-        error!("Error while setting up game: {e}")
-    } else {
-        info!("App state transitioned to Playing")
-    };
+    commands.spawn_bundle(Camera2dBundle {
+        projection: OrthographicProjection {
+            scaling_mode: ScalingMode::FixedVertical(SCENE_HEIGHT),
+            ..Default::default()
+        },
+        camera: Camera {
+            priority: 10,
+            ..default()
+        },
+        ..Default::default()
+    });
 }
 
 #[derive(Component, Debug, Copy, Clone)]
@@ -391,6 +406,10 @@ fn setup_game(
                         projection: OrthographicProjection {
                             scaling_mode: ScalingMode::FixedVertical(SCENE_HEIGHT),
                             ..Default::default()
+                        },
+                        camera: Camera {
+                            priority: 1000,
+                            ..default()
                         },
                         ..Default::default()
                     })
