@@ -226,7 +226,12 @@ fn main() {
     .add_state::<AppState>(AppState::Title)
     .add_event::<GameEvent>()
     .add_startup_system(setup)
-    .add_system_set(SystemSet::on_enter(AppState::Setup).with_system(setup_game))
+    .add_system_set(
+        SystemSet::on_enter(AppState::Setup)
+            .with_system(setup_game.after(despawn_game))
+            .with_system(despawn_game),
+    )
+    .add_system_set(SystemSet::on_enter(AppState::Title).with_system(despawn_game))
     .add_system_to_stage(CoreStage::First, update_boid_neighbors)
     .add_system_set(SystemSet::on_update(AppState::Playing).with_system(update_boid_transforms))
     .add_system_to_stage(CoreStage::Last, clear_inputs)
@@ -353,19 +358,23 @@ fn setup(
 #[derive(Component, Debug, Copy, Clone)]
 pub struct SceneRoot;
 
-fn setup_game(
-    mut commands: Commands,
-    asset_server: ResMut<AssetServer>,
-    mut app_state: ResMut<bevy::prelude::State<AppState>>,
-    scene_root: Query<Entity, With<SceneRoot>>,
-    match_settings: Res<MatchSettings>,
-) {
-    // Spawn a root node to attach everything to so we can recursively delete everything
-    // when reloading.
+fn despawn_game(mut commands: Commands, scene_root: Query<Entity, With<SceneRoot>>) {
     if let Ok(root) = scene_root.get_single() {
         info!("Restarting");
         commands.entity(root).despawn_recursive();
     }
+}
+
+fn setup_game(
+    mut commands: Commands,
+    asset_server: ResMut<AssetServer>,
+    mut app_state: ResMut<bevy::prelude::State<AppState>>,
+
+    match_settings: Res<MatchSettings>,
+) {
+    // Spawn a root node to attach everything to so we can recursively delete everything
+    // when reloading.
+
     let scene_root = commands
         .spawn()
         .insert(Name::new("Root"))

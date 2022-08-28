@@ -44,6 +44,11 @@ pub fn draw_pause_menu(
                         error!("Error when restarting game: {e}");
                     };
                 }
+                if ui.button("Return to Title").kbgp_navigation().clicked() {
+                    if let Err(e) = app_state.set(AppState::Title) {
+                        error!("Error when returning to title: {e}");
+                    };
+                }
                 if ui.button("Exit Game").kbgp_navigation().clicked() {
                     exit.send(AppExit);
                 };
