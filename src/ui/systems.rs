@@ -12,20 +12,33 @@ use egui::vec2;
 use leafwing_input_manager::prelude::*;
 
 pub fn set_ui_theme(mut ctx: ResMut<EguiContext>) {
+    let mut fonts = egui::FontDefinitions::default();
+    fonts.font_data.insert(
+        "sans".to_owned(),
+        egui::FontData::from_static(include_bytes!("../../fonts/JosefinSans-Medium.ttf")),
+    );
+    fonts
+        .families
+        .entry(egui::FontFamily::Proportional)
+        .or_default()
+        .insert(0, "sans".to_owned());
+    ctx.ctx_mut().set_fonts(fonts);
     ctx.ctx_mut().set_style(get_style());
 }
 
 pub fn draw_pause_menu(
     mut egui_context: ResMut<EguiContext>,
-    mut exit: EventWriter<AppExit>,
     mut app_state: ResMut<State<AppState>>,
 ) {
     egui::Window::new("Game Paused")
         .anchor(Align2::CENTER_CENTER, vec2(0.0, 120.0))
         .resizable(false)
         .collapsible(false)
+        .title_bar(false)
         .show(egui_context.ctx_mut(), |ui| {
-            ui.set_width(200.0);
+            ui.vertical_centered(|ui| ui.heading("Game Paused"));
+            ui.separator();
+            ui.set_width(220.0);
             ui.vertical_centered_justified(|ui| {
                 if app_state.inactives().contains(&AppState::Playing)
                     && ui
@@ -49,9 +62,6 @@ pub fn draw_pause_menu(
                         error!("Error when returning to title: {e}");
                     };
                 }
-                if ui.button("Exit Game").kbgp_navigation().clicked() {
-                    exit.send(AppExit);
-                };
             });
         });
 }
@@ -79,6 +89,7 @@ pub fn draw_title(
                         error!("Error when restarting game: {e}");
                     };
                 }
+                #[cfg(not(target_arch = "wasm32"))]
                 if ui.button("Exit Game").kbgp_navigation().clicked() {
                     exit.send(AppExit);
                 };
@@ -96,7 +107,6 @@ pub fn on_title_exit(mut query: Query<&mut Visibility, With<Logo>>) {
 
 pub fn draw_game_over(
     mut egui_context: ResMut<EguiContext>,
-    mut exit: EventWriter<AppExit>,
     mut app_state: ResMut<State<AppState>>,
     winner: Option<Res<Winner>>,
 ) {
@@ -104,11 +114,15 @@ pub fn draw_game_over(
         None => "Tie!".to_string(),
         Some(winner) => format!("{:?} Won!", winner.color),
     };
-    egui::Window::new(title)
+    egui::Window::new("Winner")
+        .title_bar(false)
         .anchor(Align2::CENTER_CENTER, vec2(0.0, 120.0))
         .resizable(false)
         .collapsible(false)
         .show(egui_context.ctx_mut(), |ui| {
+            ui.vertical_centered(|ui| ui.heading(title));
+            ui.separator();
+            ui.set_width(220.0);
             ui.set_width(200.0);
             ui.vertical_centered_justified(|ui| {
                 if ui
@@ -121,9 +135,12 @@ pub fn draw_game_over(
                         error!("Error when restarting game: {e}");
                     };
                 }
-                if ui.button("Exit Game").kbgp_navigation().clicked() {
-                    exit.send(AppExit);
-                };
+
+                if ui.button("Return to Title").kbgp_navigation().clicked() {
+                    if let Err(e) = app_state.set(AppState::Title) {
+                        error!("Error when returning to title: {e}");
+                    };
+                }
             });
         });
 }

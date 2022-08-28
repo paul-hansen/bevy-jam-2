@@ -1,9 +1,9 @@
 use bevy_egui::egui;
 use bevy_egui::egui::epaint::Shadow;
-use bevy_egui::egui::style::Margin;
+use bevy_egui::egui::style::{Margin, WidgetVisuals, Widgets};
 use bevy_egui::egui::FontFamily::Proportional;
-use bevy_egui::egui::{FontId, TextStyle, Vec2};
-use bevy_egui_kbgp::egui::Rounding;
+use bevy_egui::egui::{FontId, Stroke, TextStyle, Vec2};
+use bevy_egui_kbgp::egui::{Color32, Rounding};
 
 pub fn get_style() -> egui::Style {
     egui::Style {
@@ -16,12 +16,32 @@ pub fn get_style() -> egui::Style {
         ]
         .into(),
         spacing: egui::style::Spacing {
+            item_spacing: Vec2::new(0.0, 8.0),
             button_padding: Vec2::new(16.0, 8.0),
-            window_margin: Margin::same(10.0),
+            window_margin: Margin::same(12.0),
             ..Default::default()
         },
         visuals: egui::Visuals {
-            window_rounding: Rounding::same(1.5),
+            widgets: Widgets {
+                inactive: WidgetVisuals {
+                    rounding: Rounding::same(20.0),
+                    ..egui::Visuals::light().widgets.inactive
+                },
+                hovered: WidgetVisuals {
+                    rounding: Rounding::same(20.0),
+                    bg_fill: Color32::from_rgb(255, 80, 80),
+                    fg_stroke: Stroke::new(10.0, Color32::WHITE),
+                    ..egui::Visuals::light().widgets.hovered
+                },
+                active: WidgetVisuals {
+                    rounding: Rounding::same(20.0),
+                    bg_fill: Color32::from_rgb(230, 50, 50),
+                    fg_stroke: Stroke::new(10.0, Color32::WHITE),
+                    ..egui::Visuals::light().widgets.hovered
+                },
+                ..egui::Visuals::light().widgets
+            },
+            window_rounding: Rounding::same(2.5),
             window_shadow: Shadow {
                 extrusion: 0.0,
                 color: Default::default(),
