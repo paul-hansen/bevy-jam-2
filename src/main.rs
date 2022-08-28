@@ -318,6 +318,8 @@ fn setup(
             input_map: {
                 InputMap::<GlobalActions>::default()
                     .insert(KeyCode::Escape, GlobalActions::ToggleMenu)
+                    .insert(KeyCode::Back, GlobalActions::ToggleMenu)
+                    .insert(KeyCode::F1, GlobalActions::ToggleMenu)
                     .insert(MouseButton::Right, GlobalActions::ToggleMenu)
                     .insert(GamepadButtonType::East, GlobalActions::ToggleMenu)
                     .insert(GamepadButtonType::Select, GlobalActions::ToggleMenu)
