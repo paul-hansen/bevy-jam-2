@@ -1,7 +1,6 @@
 use crate::ui::style::get_style;
 use crate::ui::Logo;
 use crate::{AppState, BoidSettings, GlobalActions, Winner};
-use bevy::app::AppExit;
 use bevy::prelude::*;
 use bevy_egui::egui::Align2;
 use bevy_egui::{egui, EguiContext};
@@ -68,7 +67,7 @@ pub fn draw_pause_menu(
 
 pub fn draw_title(
     mut egui_context: ResMut<EguiContext>,
-    mut exit: EventWriter<AppExit>,
+    #[cfg(not(target_arch = "wasm32"))] mut exit: EventWriter<bevy::app::AppExit>,
     mut app_state: ResMut<State<AppState>>,
 ) {
     egui::Window::new("Flock Fusion")
@@ -91,7 +90,7 @@ pub fn draw_title(
                 }
                 #[cfg(not(target_arch = "wasm32"))]
                 if ui.button("Exit Game").kbgp_navigation().clicked() {
-                    exit.send(AppExit);
+                    exit.send(bevy::app::AppExit);
                 };
             });
         });
