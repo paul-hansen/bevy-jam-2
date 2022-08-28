@@ -31,7 +31,7 @@ use turborand::prelude::*;
 const SCENE_HEIGHT: f32 = 500.0;
 const BOID_COUNT: usize = 400;
 const ARENA_RADIUS: f32 = 1200.0;
-const ARENA_PADDING: f32 = 70.0;
+const ARENA_PADDING: f32 = 100.0;
 const BOID_SCALE: Vec3 = Vec3::splat(0.01);
 const LEADER_SCALE: Vec3 = Vec3::splat(0.014);
 
@@ -283,12 +283,20 @@ fn setup(
 ) {
     let inspector_window_data = inspector_windows.window_data_mut::<BoidSettings>();
     inspector_window_data.visible = false;
+    commands.spawn_bundle(ColorMesh2dBundle {
+        mesh: meshes
+            .add(Mesh::from(shape::Circle::new(ARENA_RADIUS + 2.0)))
+            .into(),
+        material: materials.add(ColorMaterial::from(Color::WHITE)),
+        ..default()
+    });
     commands
         .spawn_bundle(ColorMesh2dBundle {
             mesh: meshes
                 .add(Mesh::from(shape::Circle::new(ARENA_RADIUS)))
                 .into(),
             material: materials.add(ColorMaterial::from(asset_server.load("waves.png"))),
+            transform: Transform::from_xyz(0.0, 0.0, 0.01),
             ..default()
         })
         .insert_bundle(InputManagerBundle {
