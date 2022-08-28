@@ -6,7 +6,7 @@ on:
       - "*"
 
 env:
-  binary: "bevy-jam-2"
+  binary: "flock-fusion"
 
 jobs:
   # Build for Linux
