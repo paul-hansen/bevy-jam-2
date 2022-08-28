@@ -279,6 +279,7 @@ fn setup(
     mut materials: ResMut<Assets<ColorMaterial>>,
     mut inspector_windows: ResMut<InspectorWindows>,
     mut app_state: ResMut<bevy::prelude::State<AppState>>,
+    asset_server: ResMut<AssetServer>,
 ) {
     let inspector_window_data = inspector_windows.window_data_mut::<BoidSettings>();
     inspector_window_data.visible = false;
@@ -287,7 +288,7 @@ fn setup(
             mesh: meshes
                 .add(Mesh::from(shape::Circle::new(ARENA_RADIUS)))
                 .into(),
-            material: materials.add(ColorMaterial::from(Color::hex("6c99c0").unwrap())),
+            material: materials.add(ColorMaterial::from(asset_server.load("waves.png"))),
             ..default()
         })
         .insert_bundle(InputManagerBundle {
