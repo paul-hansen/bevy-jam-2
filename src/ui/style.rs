@@ -16,7 +16,7 @@ pub fn get_style() -> egui::Style {
         ]
         .into(),
         spacing: egui::style::Spacing {
-            item_spacing: Vec2::new(0.0, 8.0),
+            item_spacing: Vec2::new(8.0, 8.0),
             button_padding: Vec2::new(16.0, 8.0),
             window_margin: Margin::same(12.0),
             ..Default::default()
@@ -24,19 +24,19 @@ pub fn get_style() -> egui::Style {
         visuals: egui::Visuals {
             widgets: Widgets {
                 inactive: WidgetVisuals {
-                    rounding: Rounding::same(20.0),
+                    rounding: Rounding::same(15.0),
                     ..egui::Visuals::light().widgets.inactive
                 },
                 hovered: WidgetVisuals {
-                    rounding: Rounding::same(20.0),
+                    rounding: Rounding::same(15.0),
                     bg_fill: Color32::from_rgb(255, 80, 80),
-                    fg_stroke: Stroke::new(10.0, Color32::WHITE),
+                    fg_stroke: Stroke::new(1.0, Color32::WHITE),
                     ..egui::Visuals::light().widgets.hovered
                 },
                 active: WidgetVisuals {
-                    rounding: Rounding::same(20.0),
+                    rounding: Rounding::same(15.0),
                     bg_fill: Color32::from_rgb(230, 50, 50),
-                    fg_stroke: Stroke::new(10.0, Color32::WHITE),
+                    fg_stroke: Stroke::new(1.0, Color32::WHITE),
                     ..egui::Visuals::light().widgets.hovered
                 },
                 ..egui::Visuals::light().widgets

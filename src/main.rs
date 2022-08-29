@@ -4,6 +4,7 @@ mod camera;
 mod math;
 mod round;
 mod ui;
+mod viewports;
 
 use crate::ai::bots::Bot;
 use crate::boids::{
@@ -12,11 +13,18 @@ use crate::boids::{
     BoidColor, BoidNeighborsCaptureRange, BoidNeighborsSeparation, BoidSettings, GameEvent, Leader,
     Velocity,
 };
-use crate::camera::{camera_zoom, update_camera_follow_system, Camera2dFollow};
+use crate::camera::{
+    camera_zoom, remove_camera_follow_target_on_capture, update_camera_follow_many_system,
+    update_camera_follow_system, Camera2dFollow, Camera2dFollowMany, CameraFollowTarget,
+};
 use crate::math::how_much_right_or_left;
-use crate::round::{PlayerType, RoundSettings};
+use crate::round::{MultiplayerMode, PlayerType, RoundSettings};
 use crate::ui::Logo;
+use crate::viewports::{
+    set_camera_viewports, PlayerViewports, ViewportLayoutPreference, ViewportRelative,
+};
 use bevy::asset::AssetServerSettings;
+use bevy::core_pipeline::clear_color::ClearColorConfig;
 use bevy::ecs::schedule::ShouldRun;
 use bevy::prelude::*;
 use bevy::render::camera::ScalingMode;
@@ -38,6 +46,7 @@ const LEADER_SCALE: Vec3 = Vec3::splat(0.014);
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum AppState {
     Title,
+    RoundSettings,
     Setup,
     PauseMenu,
     GameOver,
@@ -53,7 +62,7 @@ fn main() {
     let mut app = App::new();
     app.insert_resource(WindowDescriptor {
         fit_canvas_to_parent: true,
-        mode: WindowMode::BorderlessFullscreen,
+        mode: WindowMode::Windowed,
         ..Default::default()
     })
     .insert_resource(Msaa { samples: 4 })
@@ -78,6 +87,7 @@ fn main() {
     .register_inspectable::<BoidColor>()
     .register_inspectable::<Velocity>()
     .register_type::<BoidAveragedInputs>()
+    .register_type::<ViewportRelative>()
     .add_state::<AppState>(AppState::Title)
     .add_event::<GameEvent>()
     .add_startup_system(setup)
@@ -91,7 +101,10 @@ fn main() {
     .add_system_set(SystemSet::on_update(AppState::Playing).with_system(update_boid_transforms))
     .add_system_to_stage(CoreStage::Last, clear_inputs)
     .add_system(update_boid_color)
+    .add_system(set_camera_viewports)
     .add_system(update_camera_follow_system)
+    .add_system(update_camera_follow_many_system)
+    .add_system(remove_camera_follow_target_on_capture)
     .add_system(camera_zoom)
     .add_system(leader_defeated)
     .add_system_set_to_stage(
@@ -233,13 +246,38 @@ fn setup_game(
 ) {
     // Spawn a root node to attach everything to so we can recursively delete everything
     // when reloading.
-
     let scene_root = commands
         .spawn()
         .insert(Name::new("Root"))
         .insert(SceneRoot)
         .insert_bundle(SpatialBundle::default())
         .id();
+
+    let shared_camera = match round_settings.multiplayer_mode {
+        MultiplayerMode::SharedScreen if round_settings.local_player_count() > 1 => {
+            let camera = commands
+                .spawn_bundle(Camera2dBundle {
+                    projection: OrthographicProjection {
+                        scaling_mode: ScalingMode::FixedVertical(SCENE_HEIGHT),
+                        ..Default::default()
+                    },
+                    camera_2d: Camera2d {
+                        clear_color: ClearColorConfig::Custom(Color::BLACK),
+                    },
+                    camera: Camera {
+                        priority: 1000,
+                        ..default()
+                    },
+                    ..Default::default()
+                })
+                .insert(Camera2dFollowMany)
+                .insert(Name::new("Camera"))
+                .id();
+            commands.entity(scene_root).add_child(camera);
+            Some(camera)
+        }
+        _ => None,
+    };
 
     let rand = Rng::new();
     for x in 0..BOID_COUNT {
@@ -262,32 +300,60 @@ fn setup_game(
             .insert(Velocity::default())
             .id();
 
+        let viewports = PlayerViewports::new(
+            round_settings.local_player_count() as u8,
+            match &round_settings.multiplayer_mode {
+                MultiplayerMode::SplitScreenVertical => ViewportLayoutPreference::Vertical,
+                _ => ViewportLayoutPreference::Horizontal,
+            },
+            2.0,
+        );
+        match shared_camera {
+            Some(_) => {
+                if let Some(player_settings) = round_settings.players.get(x) {
+                    if player_settings.player_type.is_local() {
+                        commands.entity(entity).insert(CameraFollowTarget);
+                    }
+                }
+            }
+            None => {
+                if let Some(viewport_id) = round_settings.player_viewport_id(x) {
+                    let camera = commands
+                        .spawn_bundle(Camera2dBundle {
+                            projection: OrthographicProjection {
+                                scaling_mode: ScalingMode::FixedVertical(SCENE_HEIGHT),
+                                ..Default::default()
+                            },
+                            camera_2d: Camera2d {
+                                clear_color: match viewport_id == 0 {
+                                    true => ClearColorConfig::Custom(Color::BLACK),
+                                    false => ClearColorConfig::None,
+                                },
+                            },
+                            camera: Camera {
+                                priority: (1000 + viewport_id) as isize,
+                                ..default()
+                            },
+                            ..Default::default()
+                        })
+                        .insert(Camera2dFollow {
+                            target: entity,
+                            offset: Default::default(),
+                        })
+                        .insert(viewports.get(viewport_id))
+                        .insert(Name::new(format!("Camera {viewport_id}")))
+                        .id();
+                    commands.entity(scene_root).add_child(camera);
+                }
+            }
+        }
+
         if x < round_settings.players.len() {
             let player_settings = &round_settings.players[x];
             commands
                 .entity(entity)
                 .insert(player_settings.color)
                 .insert(Leader);
-            if player_settings.player_type.is_local() {
-                let camera = commands
-                    .spawn_bundle(Camera2dBundle {
-                        projection: OrthographicProjection {
-                            scaling_mode: ScalingMode::FixedVertical(SCENE_HEIGHT),
-                            ..Default::default()
-                        },
-                        camera: Camera {
-                            priority: 1000,
-                            ..default()
-                        },
-                        ..Default::default()
-                    })
-                    .insert(Camera2dFollow {
-                        target: entity,
-                        offset: Default::default(),
-                    })
-                    .id();
-                commands.entity(scene_root).add_child(camera);
-            }
 
             if let Some(input_map) = player_settings.player_type.input_map() {
                 commands.entity(entity).insert(input_map);

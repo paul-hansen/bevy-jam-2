@@ -1,4 +1,5 @@
-use crate::{Camera2d, PlayerActions, Query, ScalingMode};
+use crate::math::Average;
+use crate::{Camera2d, Leader, PlayerActions, Query, ScalingMode, SCENE_HEIGHT};
 use bevy::math::Vec2Swizzles;
 use bevy::prelude::*;
 use bevy_inspector_egui::Inspectable;
@@ -53,5 +54,41 @@ pub fn camera_zoom(
                 }
             }
         }
+    }
+}
+
+// Add to the camera
+#[derive(Component)]
+pub struct Camera2dFollowMany;
+
+// Add to an entity to be followed by the Camera2dFollowMany camera
+#[derive(Component)]
+pub struct CameraFollowTarget;
+
+pub fn update_camera_follow_many_system(
+    mut cameras: Query<(&mut Transform, &mut OrthographicProjection), With<Camera2dFollowMany>>,
+    targets: Query<&GlobalTransform, With<CameraFollowTarget>>,
+) {
+    for (mut transform, mut projection) in cameras.iter_mut() {
+        let targets_center: Vec2 = targets.iter().map(|t| t.translation().truncate()).avg();
+        let max_distance: Option<f32> = targets
+            .iter_combinations::<2>()
+            .map(|[a, b]| a.translation().distance_squared(b.translation()))
+            .max_by(|a, b| a.total_cmp(b));
+        projection.scaling_mode = ScalingMode::FixedVertical(
+            max_distance
+                .map(|x| x.sqrt() + 150.0)
+                .unwrap_or(SCENE_HEIGHT),
+        );
+        transform.translation = targets_center.extend(transform.translation.z);
+    }
+}
+
+pub fn remove_camera_follow_target_on_capture(
+    mut commands: Commands,
+    query: Query<Entity, (Without<Leader>, With<CameraFollowTarget>)>,
+) {
+    for entity in query.iter() {
+        commands.entity(entity).remove::<CameraFollowTarget>();
     }
 }

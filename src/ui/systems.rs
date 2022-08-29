@@ -1,6 +1,10 @@
+use crate::round::PlayerSettings;
 use crate::ui::style::get_style;
 use crate::ui::Logo;
-use crate::{AppState, BoidSettings, GlobalActions, Winner};
+use crate::{
+    AppState, BoidColor, BoidSettings, Bot, GlobalActions, MultiplayerMode, PlayerType,
+    RoundSettings, Winner,
+};
 use bevy::prelude::*;
 use bevy_egui::egui::Align2;
 use bevy_egui::{egui, EguiContext};
@@ -9,6 +13,11 @@ use bevy_inspector_egui::plugin::InspectorWindows;
 use bevy_inspector_egui::WorldInspectorParams;
 use egui::vec2;
 use leafwing_input_manager::prelude::*;
+
+#[derive(Default, Debug)]
+pub struct UiData {
+    pub round_settings: RoundSettings,
+}
 
 pub fn set_ui_theme(mut ctx: ResMut<EguiContext>) {
     let mut fonts = egui::FontDefinitions::default();
@@ -79,19 +88,36 @@ pub fn draw_title(
             ui.set_width(200.0);
             ui.vertical_centered_justified(|ui| {
                 if ui
-                    .button("Start game")
+                    .button("Quick Play")
                     .kbgp_navigation()
                     .kbgp_initial_focus()
                     .clicked()
                 {
                     if let Err(e) = app_state.set(AppState::Setup) {
-                        error!("Error when restarting game: {e}");
+                        error!("Error when starting game: {e}");
                     };
                 }
+
+                if ui
+                    .button("Custom Game")
+                    .kbgp_navigation()
+                    .kbgp_initial_focus()
+                    .clicked()
+                {
+                    if let Err(e) = app_state.set(AppState::RoundSettings) {
+                        error!("Error when transitioning to round settings: {e}");
+                    };
+                }
+                ui.small("^ Play custom with friends! ^");
+
                 #[cfg(not(target_arch = "wasm32"))]
-                if ui.button("Exit Game").kbgp_navigation().clicked() {
-                    exit.send(bevy::app::AppExit);
-                };
+                {
+                    ui.separator();
+
+                    if ui.button("Exit Game").kbgp_navigation().clicked() {
+                        exit.send(bevy::app::AppExit);
+                    };
+                }
             });
         });
 }
@@ -102,6 +128,150 @@ pub fn on_title_enter(mut query: Query<&mut Visibility, With<Logo>>) {
 
 pub fn on_title_exit(mut query: Query<&mut Visibility, With<Logo>>) {
     query.single_mut().is_visible = false;
+}
+
+pub fn draw_round_settings(
+    mut egui_context: ResMut<EguiContext>,
+    mut app_state: ResMut<State<AppState>>,
+    mut ui_data: ResMut<UiData>,
+    mut round_settings: ResMut<RoundSettings>,
+) {
+    egui::Window::new("Round Settings")
+        .title_bar(false)
+        .anchor(Align2::CENTER_CENTER, vec2(0.0, 0.0))
+        .resizable(false)
+        .collapsible(false)
+        .show(egui_context.ctx_mut(), |ui| {
+            ui.set_width(200.0);
+
+            egui::Grid::new("players")
+                .min_row_height(40.0)
+                .num_columns(4)
+                .show(ui, |ui| {
+                    ui.label("Player");
+                    ui.label("Type");
+                    ui.end_row();
+                    let mut remove_indexes = Vec::new();
+                    for (i, player_setting) in ui_data.round_settings.players.iter_mut().enumerate()
+                    {
+                        ui.label(format!("Player {}", i + 1));
+                        egui::ComboBox::from_id_source(format!("player_settings_type{i}"))
+                            .selected_text(player_setting.player_type.human_bot_label())
+                            .show_ui(ui, |ui| {
+                                ui.set_width(200.0);
+                                ui.selectable_value(
+                                    &mut player_setting.player_type,
+                                    PlayerType::AnyDevice,
+                                    "Human",
+                                )
+                                .kbgp_navigation();
+                                ui.selectable_value(
+                                    &mut player_setting.player_type,
+                                    PlayerType::Bot(Bot::BrainDead),
+                                    "Bot",
+                                )
+                                .kbgp_navigation();
+                            })
+                            .response
+                            .kbgp_navigation();
+                        egui::ComboBox::from_id_source(format!("player_settings_extra_{i}"))
+                            .selected_text(player_setting.player_type.to_string())
+                            .show_ui(ui, |ui| {
+                                ui.set_width(200.0);
+                                if player_setting.player_type.is_local() {
+                                    for option in PlayerType::human_options() {
+                                        ui.selectable_value(
+                                            &mut player_setting.player_type,
+                                            option,
+                                            option.to_string(),
+                                        )
+                                        .kbgp_navigation();
+                                    }
+                                } else {
+                                    for option in PlayerType::bot_options() {
+                                        ui.selectable_value(
+                                            &mut player_setting.player_type,
+                                            option,
+                                            option.to_string(),
+                                        )
+                                        .kbgp_navigation();
+                                    }
+                                }
+                            })
+                            .response
+                            .kbgp_navigation();
+                        if ui.button("X").kbgp_navigation().clicked() {
+                            remove_indexes.push(i);
+                        }
+                        ui.end_row();
+                    }
+
+                    for index in remove_indexes {
+                        ui_data.round_settings.players.remove(index);
+                    }
+                    let new_id = ui_data.round_settings.players.len();
+                    if let Some(new_color) = BoidColor::from_index(new_id) {
+                        if ui.button("Add Player").kbgp_navigation().clicked() {
+                            ui_data.round_settings.players.push(PlayerSettings {
+                                player_type: default(),
+                                color: new_color,
+                            });
+                        }
+                        ui.end_row();
+                    }
+                });
+
+            ui.vertical_centered_justified(|ui| {
+                if ui_data.round_settings.local_player_count() > 1 {
+                    ui.label("Local Multiplayer Mode: ");
+                    egui::ComboBox::from_id_source("local_screen_type")
+                        .width(ui.available_width())
+                        .selected_text(ui_data.round_settings.multiplayer_mode.to_string())
+                        .show_ui(ui, |ui| {
+                            ui.selectable_value(
+                                &mut ui_data.round_settings.multiplayer_mode,
+                                MultiplayerMode::SharedScreen,
+                                MultiplayerMode::SharedScreen.to_string(),
+                            )
+                            .kbgp_navigation();
+
+                            ui.selectable_value(
+                                &mut ui_data.round_settings.multiplayer_mode,
+                                MultiplayerMode::SplitScreenVertical,
+                                MultiplayerMode::SplitScreenVertical.to_string(),
+                            )
+                            .kbgp_navigation();
+
+                            ui.selectable_value(
+                                &mut ui_data.round_settings.multiplayer_mode,
+                                MultiplayerMode::SplitScreenHorizontal,
+                                MultiplayerMode::SplitScreenHorizontal.to_string(),
+                            )
+                            .kbgp_navigation();
+                        })
+                        .response
+                        .kbgp_navigation();
+                }
+
+                if ui.button("Back").kbgp_navigation().clicked() {
+                    *round_settings = ui_data.round_settings.clone();
+                    if let Err(e) = app_state.set(AppState::Title) {
+                        error!("Error when backing out of custom game: {e}");
+                    };
+                }
+                if ui
+                    .button("Start Game")
+                    .kbgp_navigation()
+                    .kbgp_initial_focus()
+                    .clicked()
+                {
+                    *round_settings = ui_data.round_settings.clone();
+                    if let Err(e) = app_state.set(AppState::Setup) {
+                        error!("Error when starting custom game: {e}");
+                    };
+                }
+            });
+        });
 }
 
 pub fn draw_game_over(

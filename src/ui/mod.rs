@@ -25,8 +25,14 @@ impl Plugin for UiAppPlugin {
             .add_system_set(SystemSet::on_exit(AppState::Title).with_system(lock_mouse))
             .add_system_set(SystemSet::on_enter(AppState::Title).with_system(on_title_enter))
             .add_system_set(SystemSet::on_exit(AppState::Title).with_system(on_title_exit))
+            .add_system_set(
+                SystemSet::on_update(AppState::RoundSettings).with_system(draw_round_settings),
+            )
+            .add_system_set(SystemSet::on_enter(AppState::RoundSettings).with_system(unlock_mouse))
+            .add_system_set(SystemSet::on_exit(AppState::RoundSettings).with_system(lock_mouse))
             .add_system(toggle_pause_menu)
             .add_system(toggle_boid_settings)
-            .add_system(toggle_world_inspector);
+            .add_system(toggle_world_inspector)
+            .insert_resource(UiData::default());
     }
 }

@@ -5,8 +5,9 @@ pub mod coward;
 pub mod hunter;
 pub mod speedy;
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Default)]
 pub enum Bot {
+    #[default]
     BrainDead,
     Speedy,
     Coward,
