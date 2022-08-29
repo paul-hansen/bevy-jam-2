@@ -155,9 +155,9 @@ pub struct PlayerSettings {
 #[derive(Debug, Clone, Default, Eq, PartialEq)]
 pub enum MultiplayerMode {
     #[default]
-    SharedScreen,
     SplitScreenVertical,
     SplitScreenHorizontal,
+    SharedScreen,
 }
 
 impl std::fmt::Display for MultiplayerMode {

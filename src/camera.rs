@@ -77,7 +77,7 @@ pub fn update_camera_follow_many_system(
             .max_by(|a, b| a.total_cmp(b));
         projection.scaling_mode = ScalingMode::FixedVertical(
             max_distance
-                .map(|x| x.sqrt() + 150.0)
+                .map(|x| x.sqrt() + 500.0)
                 .unwrap_or(SCENE_HEIGHT),
         );
         transform.translation = targets_center.extend(transform.translation.z);
