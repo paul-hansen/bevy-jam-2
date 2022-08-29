@@ -167,7 +167,7 @@ pub fn draw_round_settings(
                                 .kbgp_navigation();
                                 ui.selectable_value(
                                     &mut player_setting.player_type,
-                                    PlayerType::Bot(Bot::BrainDead),
+                                    PlayerType::Bot(Bot::BoneHead),
                                     "Bot",
                                 )
                                 .kbgp_navigation();

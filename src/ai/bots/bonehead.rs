@@ -3,10 +3,10 @@ use std::fmt::Formatter;
 
 /// A bot that just goes forward
 #[derive(Default, Component)]
-pub struct BrainDead {}
+pub struct BoneHead {}
 
-impl std::fmt::Display for BrainDead {
+impl std::fmt::Display for BoneHead {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Brain Dead")
+        write!(f, "Bonehead")
     }
 }

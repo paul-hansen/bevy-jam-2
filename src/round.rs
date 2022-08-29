@@ -37,8 +37,8 @@ impl PlayerType {
 
     pub fn bot_options() -> [Self; 4] {
         [
-            Self::Bot(Bot::BrainDead),
-            Self::Bot(Bot::Coward),
+            Self::Bot(Bot::BoneHead),
+            Self::Bot(Bot::ScaredyCat),
             Self::Bot(Bot::Speedy),
             Self::Bot(Bot::Hunter),
         ]
@@ -140,7 +140,7 @@ impl std::fmt::Display for PlayerType {
             PlayerType::AnyDevice => write!(f, "All Devices"),
             PlayerType::GamePad(Some(gamepad)) => write!(f, "Gamepad {}", gamepad.id + 1),
             PlayerType::GamePad(None) => write!(f, "Any Gamepad"),
-            PlayerType::Bot(b) => write!(f, "{:?}", b),
+            PlayerType::Bot(b) => write!(f, "{}", b),
             _ => write!(f, "{self:?}"),
         }
     }
@@ -208,15 +208,15 @@ impl Default for RoundSettings {
                     color: BoidColor::Red,
                 },
                 PlayerSettings {
-                    player_type: PlayerType::Bot(Bot::BrainDead),
+                    player_type: PlayerType::Bot(Bot::BoneHead),
                     color: BoidColor::Green,
                 },
                 PlayerSettings {
-                    player_type: PlayerType::Bot(Bot::BrainDead),
+                    player_type: PlayerType::Bot(Bot::BoneHead),
                     color: BoidColor::Blue,
                 },
                 PlayerSettings {
-                    player_type: PlayerType::Bot(Bot::Coward),
+                    player_type: PlayerType::Bot(Bot::ScaredyCat),
                     color: BoidColor::Yellow,
                 },
                 PlayerSettings {
@@ -228,11 +228,11 @@ impl Default for RoundSettings {
                     color: BoidColor::Orange,
                 },
                 PlayerSettings {
-                    player_type: PlayerType::Bot(Bot::BrainDead),
+                    player_type: PlayerType::Bot(Bot::BoneHead),
                     color: BoidColor::Pink,
                 },
                 PlayerSettings {
-                    player_type: PlayerType::Bot(Bot::BrainDead),
+                    player_type: PlayerType::Bot(Bot::BoneHead),
                     color: BoidColor::Cyan,
                 },
             ],

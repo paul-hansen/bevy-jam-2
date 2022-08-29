@@ -5,17 +5,20 @@ use std::fmt::Formatter;
 
 /// A bot that always boosts
 #[derive(Default, Component)]
-pub struct Coward {}
+pub struct ScaredyCat {}
 
-impl std::fmt::Display for Coward {
+impl std::fmt::Display for ScaredyCat {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Coward")
+        write!(f, "Scaredy Cat")
     }
 }
 
 #[allow(clippy::type_complexity)]
 pub fn update(
-    mut query: Query<(Entity, &Transform, &mut BoidAveragedInputs), (With<Coward>, With<Leader>)>,
+    mut query: Query<
+        (Entity, &Transform, &mut BoidAveragedInputs),
+        (With<ScaredyCat>, With<Leader>),
+    >,
     leaders: Query<(Entity, &Transform), With<Leader>>,
 ) {
     let leaders: Vec<_> = leaders.iter().map(|(e, t)| (e, *t)).collect();
