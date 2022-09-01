@@ -6,6 +6,7 @@ use crate::{
     RoundSettings, Winner,
 };
 use bevy::prelude::*;
+use bevy::window::WindowMode;
 use bevy_egui::egui::Align2;
 use bevy_egui::{egui, EguiContext};
 use bevy_egui_kbgp::KbgpEguiResponseExt;
@@ -379,5 +380,22 @@ pub fn toggle_world_inspector(
         let window = windows.get_primary_mut().unwrap();
         window.set_cursor_lock_mode(!world_inspector_params.enabled);
         window.set_cursor_visibility(world_inspector_params.enabled);
+    }
+}
+
+pub fn toggle_fullscreen(
+    action_state: Query<&ActionState<GlobalActions>>,
+    mut windows: ResMut<Windows>,
+) {
+    let action_state = action_state.single();
+    if action_state.just_released(GlobalActions::ToggleFullScreen) {
+        for window in windows.iter_mut() {
+            if window.is_focused() {
+                match window.mode() {
+                    WindowMode::Windowed => window.set_mode(WindowMode::BorderlessFullscreen),
+                    _ => window.set_mode(WindowMode::Windowed),
+                }
+            }
+        }
     }
 }

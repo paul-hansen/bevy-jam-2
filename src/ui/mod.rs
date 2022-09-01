@@ -33,6 +33,7 @@ impl Plugin for UiAppPlugin {
             .add_system(toggle_pause_menu)
             .add_system(toggle_boid_settings)
             .add_system(toggle_world_inspector)
+            .add_system(toggle_fullscreen)
             .insert_resource(UiData::default());
     }
 }
