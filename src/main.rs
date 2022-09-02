@@ -43,14 +43,16 @@ const ARENA_PADDING: f32 = 100.0;
 const BOID_SCALE: Vec3 = Vec3::splat(0.01);
 const LEADER_SCALE: Vec3 = Vec3::splat(0.014);
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Default)]
 pub enum AppState {
+    #[default]
     Title,
-    RoundSettings,
-    Setup,
-    PauseMenu,
+    LoadRound,
     GameOver,
     Playing,
+    CustomGameMenu,
+    PauseMenu,
+    SettingsMenu,
 }
 
 #[derive(Debug, Clone)]
@@ -88,11 +90,11 @@ fn main() {
     .register_inspectable::<Velocity>()
     .register_type::<BoidAveragedInputs>()
     .register_type::<ViewportRelative>()
-    .add_state::<AppState>(AppState::Title)
+    .add_state::<AppState>(AppState::default())
     .add_event::<GameEvent>()
     .add_startup_system(setup)
     .add_system_set(
-        SystemSet::on_enter(AppState::Setup)
+        SystemSet::on_enter(AppState::LoadRound)
             .with_system(setup_game.after(despawn_game))
             .with_system(despawn_game),
     )

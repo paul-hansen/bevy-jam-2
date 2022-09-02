@@ -7,17 +7,37 @@ use crate::{
 };
 use bevy::prelude::*;
 use bevy::window::WindowMode;
-use bevy_egui::egui::Align2;
+use bevy_egui::egui::{Align, Align2, InnerResponse, Response, Ui};
 use bevy_egui::{egui, EguiContext};
 use bevy_egui_kbgp::KbgpEguiResponseExt;
 use bevy_inspector_egui::plugin::InspectorWindows;
 use bevy_inspector_egui::WorldInspectorParams;
 use egui::vec2;
 use leafwing_input_manager::prelude::*;
+use std::fmt::Debug;
 
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub struct UiData {
     pub round_settings: RoundSettings,
+    pub window_mode: WindowMode,
+    pub window_width: f32,
+    pub window_height: f32,
+}
+
+#[derive(Debug)]
+pub enum UiEvent {
+    SettingsSaved,
+}
+
+impl Default for UiData {
+    fn default() -> Self {
+        Self {
+            round_settings: Default::default(),
+            window_mode: WindowMode::Windowed,
+            window_width: 1280.0,
+            window_height: 800.0,
+        }
+    }
 }
 
 pub fn set_ui_theme(mut ctx: ResMut<EguiContext>) {
@@ -62,10 +82,17 @@ pub fn draw_pause_menu(
                 }
 
                 if ui.button("Restart").kbgp_navigation().clicked() {
-                    if let Err(e) = app_state.set(AppState::Setup) {
+                    if let Err(e) = app_state.set(AppState::LoadRound) {
                         error!("Error when restarting game: {e}");
                     };
                 }
+
+                if ui.button("Settings").kbgp_navigation().clicked() {
+                    if let Err(e) = app_state.push(AppState::SettingsMenu) {
+                        error!("Error when opening settings menu from pause menu: {e}");
+                    };
+                }
+
                 if ui.button("Return to Title").kbgp_navigation().clicked() {
                     if let Err(e) = app_state.set(AppState::Title) {
                         error!("Error when returning to title: {e}");
@@ -94,7 +121,7 @@ pub fn draw_title(
                     .kbgp_initial_focus()
                     .clicked()
                 {
-                    if let Err(e) = app_state.set(AppState::Setup) {
+                    if let Err(e) = app_state.set(AppState::LoadRound) {
                         error!("Error when starting game: {e}");
                     };
                 }
@@ -105,11 +132,22 @@ pub fn draw_title(
                     .kbgp_initial_focus()
                     .clicked()
                 {
-                    if let Err(e) = app_state.set(AppState::RoundSettings) {
+                    if let Err(e) = app_state.set(AppState::CustomGameMenu) {
                         error!("Error when transitioning to round settings: {e}");
                     };
                 }
                 ui.small("^ Play custom with friends! ^");
+
+                if ui
+                    .button("Settings")
+                    .kbgp_navigation()
+                    .kbgp_initial_focus()
+                    .clicked()
+                {
+                    if let Err(e) = app_state.push(AppState::SettingsMenu) {
+                        error!("Error when transitioning to round settings: {e}");
+                    };
+                }
 
                 #[cfg(not(target_arch = "wasm32"))]
                 {
@@ -253,24 +291,25 @@ pub fn draw_round_settings(
                         .response
                         .kbgp_navigation();
                 }
-
-                if ui.button("Back").kbgp_navigation().clicked() {
-                    *round_settings = ui_data.round_settings.clone();
-                    if let Err(e) = app_state.set(AppState::Title) {
-                        error!("Error when backing out of custom game: {e}");
-                    };
-                }
-                if ui
-                    .button("Start Game")
-                    .kbgp_navigation()
-                    .kbgp_initial_focus()
-                    .clicked()
-                {
-                    *round_settings = ui_data.round_settings.clone();
-                    if let Err(e) = app_state.set(AppState::Setup) {
-                        error!("Error when starting custom game: {e}");
-                    };
-                }
+                horizontal_right_to_left_top(ui, |ui| {
+                    if ui
+                        .button("Start Game")
+                        .kbgp_navigation()
+                        .kbgp_initial_focus()
+                        .clicked()
+                    {
+                        *round_settings = ui_data.round_settings.clone();
+                        if let Err(e) = app_state.set(AppState::LoadRound) {
+                            error!("Error when starting custom game: {e}");
+                        };
+                    }
+                    if ui.button("Back").kbgp_navigation().clicked() {
+                        *round_settings = ui_data.round_settings.clone();
+                        if let Err(e) = app_state.set(AppState::Title) {
+                            error!("Error when backing out of custom game: {e}");
+                        };
+                    }
+                });
             });
         });
 }
@@ -301,7 +340,7 @@ pub fn draw_game_over(
                     .kbgp_initial_focus()
                     .clicked()
                 {
-                    if let Err(e) = app_state.set(AppState::Setup) {
+                    if let Err(e) = app_state.set(AppState::LoadRound) {
                         error!("Error when restarting game: {e}");
                     };
                 }
@@ -313,6 +352,95 @@ pub fn draw_game_over(
                 }
             });
         });
+}
+
+pub fn draw_settings(
+    mut egui_context: ResMut<EguiContext>,
+    mut app_state: ResMut<State<AppState>>,
+    mut ui_data: ResMut<UiData>,
+    mut ui_event_writer: EventWriter<UiEvent>,
+) {
+    egui::Window::new("Settings")
+        .anchor(Align2::CENTER_CENTER, vec2(0.0, 0.0))
+        .resizable(false)
+        .collapsible(false)
+        .title_bar(false)
+        .show(egui_context.ctx_mut(), |ui| {
+            ui.set_width(240.0);
+            ui.vertical_centered(|ui| ui.heading("Settings"));
+            ui.separator();
+            ui.vertical_centered_justified(|ui| {
+                ui_data.window_mode.draw_as_combo_box(ui, 210.0);
+                if ui_data.window_mode == WindowMode::SizedFullscreen {
+                    ui.add(
+                        egui::DragValue::new(&mut ui_data.window_width)
+                            .speed(1.0)
+                            .clamp_range(100.0..=50000.0)
+                            .prefix("W: "),
+                    );
+                    ui.add(
+                        egui::DragValue::new(&mut ui_data.window_height)
+                            .speed(1.0)
+                            .clamp_range(100.0..=50000.0)
+                            .prefix("H: "),
+                    );
+                }
+                horizontal_right_to_left_top(ui, |ui| {
+                    if ui
+                        .button("Save")
+                        .kbgp_navigation()
+                        .kbgp_initial_focus()
+                        .clicked()
+                    {
+                        if let Err(e) = app_state.pop() {
+                            error!("Error closing settings: {e}");
+                        };
+                        ui_event_writer.send(UiEvent::SettingsSaved);
+                    }
+
+                    if ui.button("Back").kbgp_navigation().clicked() {
+                        if let Err(e) = app_state.pop() {
+                            error!("Error closing settings: {e}");
+                        };
+                    }
+                });
+            });
+        });
+}
+
+/// Helper for laying out buttons side by side right aligned.
+/// Add contents in reverse order.
+pub fn horizontal_right_to_left_top<R>(
+    ui: &mut Ui,
+    add_contents: impl FnOnce(&mut Ui) -> R,
+) -> InnerResponse<InnerResponse<R>> {
+    ui.horizontal_top(|ui| {
+        ui.with_layout(
+            egui::Layout::right_to_left().with_cross_align(Align::TOP),
+            add_contents,
+        )
+    })
+}
+
+pub fn handle_ui_events(
+    mut events: EventReader<UiEvent>,
+    mut windows: ResMut<Windows>,
+    ui_data: Res<UiData>,
+) {
+    for event in events.iter() {
+        info!("{event:?}");
+        match event {
+            UiEvent::SettingsSaved => {
+                let window = windows.primary_mut();
+                if window.mode() != ui_data.window_mode {
+                    window.set_mode(ui_data.window_mode);
+                }
+                if window.mode() == WindowMode::SizedFullscreen {
+                    window.set_resolution(ui_data.window_width, ui_data.window_height);
+                }
+            }
+        }
+    }
 }
 
 /// Handles toggling the Menu app state when the toggle menu button is pressed
@@ -397,5 +525,69 @@ pub fn toggle_fullscreen(
                 }
             }
         }
+    }
+}
+
+pub trait ComboBoxEnum {
+    fn combo_box_label() -> &'static str;
+
+    fn values(&self) -> Box<dyn Iterator<Item = Self>>;
+
+    fn value_label(&self) -> String;
+
+    fn draw_as_combo_box(
+        &mut self,
+        ui: &mut Ui,
+        width: f32,
+    ) -> InnerResponse<Option<Option<Response>>>
+    where
+        Self: Eq + Copy,
+    {
+        let mut inner_response = egui::ComboBox::from_id_source(Self::combo_box_label())
+            .selected_text(self.value_label())
+            .width(width)
+            .show_ui(ui, |ui| {
+                self.values()
+                    .map(|value| {
+                        ui.selectable_value(self, value, value.value_label())
+                            .kbgp_navigation()
+                    })
+                    .fold(None, |a, b| Some(a.map_or(b.clone(), |a| a | b.clone())))
+            });
+
+        inner_response.response = inner_response.response.kbgp_navigation();
+        inner_response
+    }
+}
+
+impl ComboBoxEnum for WindowMode {
+    fn combo_box_label() -> &'static str {
+        "Window Mode"
+    }
+
+    fn values(&self) -> Box<dyn Iterator<Item = Self>> {
+        Box::new(
+            [
+                Self::Windowed,
+                Self::BorderlessFullscreen,
+                #[cfg(not(target_arch = "wasm32"))]
+                Self::Fullscreen,
+            ]
+            .iter()
+            .copied(),
+        )
+    }
+
+    fn value_label(&self) -> String {
+        match self {
+            WindowMode::Windowed => "Windowed",
+            #[cfg(not(target_arch = "wasm32"))]
+            WindowMode::BorderlessFullscreen => "Borderless Fullscreen",
+            #[cfg(target_arch = "wasm32")]
+            WindowMode::BorderlessFullscreen => "Fullscreen",
+            WindowMode::SizedFullscreen => "Fullscreen Custom",
+            WindowMode::Fullscreen => "Fullscreen",
+        }
+        .to_string()
     }
 }
