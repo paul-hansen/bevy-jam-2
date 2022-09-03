@@ -216,6 +216,17 @@ impl BoidColor {
         }
     }
 
+    pub const ALL: [Self; 8] = [
+        Self::Red,
+        Self::Green,
+        Self::Blue,
+        Self::Yellow,
+        Self::Purple,
+        Self::Orange,
+        Self::Pink,
+        Self::Cyan,
+    ];
+
     pub fn color(&self) -> Color {
         match self {
             BoidColor::Red => Color::RED,
@@ -341,18 +352,31 @@ pub enum GameEvent {
 
 pub fn propagate_boid_color(
     mut commands: Commands,
-    mut query: Query<(Entity, &BoidNeighborsCaptureRange), With<Boid>>,
+    query: Query<(Entity, &BoidNeighborsCaptureRange)>,
     mut boid_colors: Query<&mut BoidColor>,
     leader_query: Query<&Leader>,
     mut event_writer: EventWriter<GameEvent>,
 ) {
-    for (entity, neighbors) in query.iter_mut() {
+    for (entity, neighbors) in query.iter() {
         let mut neighbor_color_counts: HashMap<BoidColor, usize> = HashMap::new();
-        for other_color in boid_colors.iter_many(&neighbors.entities) {
-            let count = neighbor_color_counts.entry(*other_color).or_insert(0);
-            *count += 1;
+        for color in BoidColor::ALL {
+            let mut results = Vec::new();
+            get_neighbors_of_color_recursive(
+                entity,
+                neighbors,
+                color,
+                &query,
+                &boid_colors,
+                &mut results,
+                5,
+            );
+            neighbor_color_counts.insert(color, results.len());
         }
-        let dominate_color = neighbor_color_counts.into_iter().max_by_key(|(_, c)| *c);
+
+        let dominate_color = neighbor_color_counts
+            .into_iter()
+            .filter(|(_, v)| *v != 0)
+            .max_by_key(|(_, c)| *c);
         if let Some((dominate_color, count)) = dominate_color {
             if let Ok(mut our_color) = boid_colors.get_mut(entity) {
                 // Decide if we should convert it
@@ -372,17 +396,56 @@ pub fn propagate_boid_color(
                 commands.entity(entity).insert(dominate_color);
             }
         }
+    }
 
-        // Check if there is only one color left
-        let mut remaining_colors = boid_colors.iter().unique();
-        if let Some(first_color) = remaining_colors.next() {
-            if remaining_colors.count() == 0 {
-                event_writer.send(GameEvent::GameOver(Winner {
-                    color: *first_color,
-                }));
-            }
+    // Check if there is only one color left
+    let mut remaining_colors = boid_colors.iter().unique();
+    if let Some(first_color) = remaining_colors.next() {
+        if remaining_colors.count() == 0 {
+            event_writer.send(GameEvent::GameOver(Winner {
+                color: *first_color,
+            }));
         }
     }
+}
+
+/// Get all the neighbors in capture range and their neighbors and their neighbors etc.
+/// Does not include itself.
+///
+/// Pass a vector of all the previously visited entities to prevent duplicates
+pub fn get_neighbors_of_color_recursive(
+    entity: Entity,
+    neighbors: &BoidNeighborsCaptureRange,
+    color: BoidColor,
+    query: &Query<(Entity, &BoidNeighborsCaptureRange)>,
+    colors: &Query<&mut BoidColor>,
+    results: &mut Vec<Entity>,
+    depth: usize,
+) {
+    if depth == 0 {
+        return;
+    }
+    neighbors
+        .entities
+        .iter()
+        .flat_map(|neighbor| query.get(*neighbor))
+        // Remove colorless
+        .flat_map(|(e, n)| colors.get(e).map(|c| (e, n, *c)))
+        .filter(|(e, _, c)| *c == color && *e != entity)
+        .for_each(|(e, neighbors, color)| {
+            if !results.contains(&e) {
+                results.push(e);
+                get_neighbors_of_color_recursive(
+                    e,
+                    neighbors,
+                    color,
+                    query,
+                    colors,
+                    results,
+                    depth - 1,
+                );
+            }
+        });
 }
 
 pub fn leader_removed(removals: RemovedComponents<Leader>, mut query: Query<&mut Transform>) {
