@@ -29,7 +29,7 @@ pub fn update(
         *count += 1;
     }
     let leaders: Vec<_> = leaders.iter().map(|(e, t, c)| (e, *t, c)).collect();
-
+    let sight_range = 500.0f32.powf(2.0);
     for (entity, transform, mut inputs, color) in query.iter_mut() {
         if let Some(closest_leader) = leaders
             .iter()
@@ -42,7 +42,7 @@ pub fn update(
             })
             .map(|(_, t, c)| (t.translation.distance_squared(transform.translation), t, c))
             // limit sight range
-            .filter(|(d, _, _)| *d < 500.0f32.powf(2.0))
+            .filter(|(d, _, _)| *d < sight_range)
             // find the leader with the least followers
             .min_by(|(_, _, a), (_, _, b)| color_counts[a].cmp(&color_counts[b]))
         {

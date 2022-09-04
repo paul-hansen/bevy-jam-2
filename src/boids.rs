@@ -169,18 +169,20 @@ pub fn update_boid_neighbors(
         .iter()
         .map(|(entity, transform, _, _)| (entity, transform.translation))
         .collect();
+    let separation_distance_squared = boid_settings.separation_distance.powf(2.0);
+    let capture_range_squared = boid_settings.capture_range.powf(2.0);
     for (entity, transform, mut capture_neighbors, mut separation_neighbors) in query.iter_mut() {
         let mut c = Vec::new();
         let mut s = Vec::new();
         for (target, position) in positions.iter().filter(|(t, _)| t.id() != entity.id()) {
-            let distance = transform
+            let distance_squared = transform
                 .translation
                 .truncate()
                 .distance_squared(position.truncate());
-            if distance < boid_settings.separation_distance.powf(2.0) {
+            if distance_squared < separation_distance_squared {
                 s.push(*target)
             }
-            if distance < boid_settings.capture_range.powf(2.0) {
+            if distance_squared < capture_range_squared {
                 c.push(*target);
             }
         }
@@ -256,6 +258,7 @@ pub fn update_boid_transforms(
     boid_settings: Res<BoidSettings>,
     round_settings: Res<RoundSettings>,
 ) {
+    let active_arena_radius_squared = (round_settings.arena_radius - ARENA_PADDING).powf(2.);
     for (mut transform, mut action_state, inputs, mut velocity) in boid_query.iter_mut() {
         if boid_settings.debug_lines {
             lines.line_colored(
@@ -271,7 +274,7 @@ pub fn update_boid_transforms(
 
         // if headed out of bounds, rotate towards the center
         let direction = -transform.translation.truncate();
-        if direction.length_squared() > (round_settings.arena_radius - ARENA_PADDING).powf(2.) {
+        if direction.length_squared() > active_arena_radius_squared {
             let angle = direction.y.atan2(direction.x) - FRAC_PI_2;
 
             transform.rotation.rotate_towards(
@@ -385,7 +388,7 @@ pub fn propagate_boid_color(
                 &query,
                 &boid_colors,
                 &mut results,
-                5,
+                10,
             );
             if !results.is_empty() {
                 neighbor_color_counts.insert(color, results.len());

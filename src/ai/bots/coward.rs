@@ -22,7 +22,7 @@ pub fn update(
     leaders: Query<(Entity, &Transform), With<Leader>>,
 ) {
     let leaders: Vec<_> = leaders.iter().map(|(e, t)| (e, *t)).collect();
-
+    let run_away_range = 300.0f32.powf(2.0);
     for (entity, transform, mut inputs) in query.iter_mut() {
         if let Some(closest_leader) = leaders
             .iter()
@@ -30,7 +30,7 @@ pub fn update(
             .map(|(_, t)| (t.translation.distance_squared(transform.translation), t))
             .min_by(|(a, _), (b, _)| a.total_cmp(b))
         {
-            if closest_leader.0 < 300.0f32.powf(2.0) {
+            if closest_leader.0 < run_away_range {
                 inputs.add_turn(direction_to_turn_away_from_target(
                     transform,
                     closest_leader.1.translation.truncate(),
