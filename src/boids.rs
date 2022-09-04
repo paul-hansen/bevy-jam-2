@@ -359,7 +359,24 @@ pub fn propagate_boid_color(
 ) {
     for (entity, neighbors) in query.iter() {
         let mut neighbor_color_counts: HashMap<BoidColor, usize> = HashMap::new();
-        for color in BoidColor::ALL {
+
+        // Build a list of all the colors with our color last if we have one.
+        // Use this later to skip checking neighbors of our color if there aren't other colors.
+        let our_color = boid_colors.get(entity);
+        let mut all_colors = BoidColor::ALL.to_vec();
+        if let Ok(our_color) = our_color {
+            all_colors = all_colors
+                .iter()
+                .filter(|c| *c != our_color)
+                .cloned()
+                .chain([*our_color])
+                .collect();
+        }
+
+        for color in all_colors {
+            if Ok(&color) == our_color && neighbor_color_counts.keys().len() == 0 {
+                continue;
+            }
             let mut results = Vec::new();
             get_neighbors_of_color_recursive(
                 entity,
@@ -370,7 +387,9 @@ pub fn propagate_boid_color(
                 &mut results,
                 5,
             );
-            neighbor_color_counts.insert(color, results.len());
+            if !results.is_empty() {
+                neighbor_color_counts.insert(color, results.len());
+            }
         }
 
         let dominate_color = neighbor_color_counts
