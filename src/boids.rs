@@ -176,11 +176,11 @@ pub fn update_boid_neighbors(
             let distance = transform
                 .translation
                 .truncate()
-                .distance(position.truncate());
-            if distance < boid_settings.separation_distance {
+                .distance_squared(position.truncate());
+            if distance < boid_settings.separation_distance.powf(2.0) {
                 s.push(*target)
             }
-            if distance < boid_settings.capture_range {
+            if distance < boid_settings.capture_range.powf(2.0) {
                 c.push(*target);
             }
         }
