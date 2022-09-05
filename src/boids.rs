@@ -169,8 +169,9 @@ pub fn update_boid_neighbors(
         .iter()
         .map(|(entity, transform, _, _)| (entity, transform.translation))
         .collect();
-    let separation_distance_squared = boid_settings.separation_distance.powf(2.0);
-    let capture_range_squared = boid_settings.capture_range.powf(2.0);
+    let separation_distance_squared =
+        boid_settings.separation_distance * boid_settings.capture_range;
+    let capture_range_squared = boid_settings.capture_range * boid_settings.capture_range;
     for (entity, transform, mut capture_neighbors, mut separation_neighbors) in query.iter_mut() {
         let mut c = Vec::new();
         let mut s = Vec::new();
