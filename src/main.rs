@@ -2,6 +2,7 @@ mod ai;
 mod boids;
 mod camera;
 mod math;
+mod quadtree;
 mod round;
 mod ui;
 mod viewports;
@@ -9,9 +10,9 @@ mod viewports;
 use crate::ai::bots::Bot;
 use crate::boids::{
     clear_inputs, leader_added, leader_defeated, leader_removed, propagate_boid_color,
-    update_boid_color, update_boid_neighbors, update_boid_transforms, Boid, BoidAveragedInputs,
-    BoidColor, BoidNeighborsCaptureRange, BoidNeighborsSeparation, BoidSettings, GameEvent, Leader,
-    Velocity,
+    update_boid_color, update_boid_neighbors, update_boid_transforms, update_quad_tree, Boid,
+    BoidAveragedInputs, BoidColor, BoidNeighborsCaptureRange, BoidNeighborsSeparation,
+    BoidSettings, GameEvent, Leader, Velocity,
 };
 use crate::camera::{
     camera_zoom, remove_camera_follow_target_on_capture, update_camera_follow_many_system,
@@ -99,7 +100,11 @@ fn main() {
             .with_system(despawn_game),
     )
     .add_system_set(SystemSet::on_enter(AppState::Title).with_system(despawn_game))
-    .add_system_to_stage(CoreStage::First, update_boid_neighbors)
+    .add_system_to_stage(CoreStage::First, update_quad_tree)
+    .add_system_to_stage(
+        CoreStage::First,
+        update_boid_neighbors.after(update_quad_tree),
+    )
     .add_system_set(SystemSet::on_update(AppState::Playing).with_system(update_boid_transforms))
     .add_system_to_stage(CoreStage::Last, clear_inputs)
     .add_system(update_boid_color)

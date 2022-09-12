@@ -1,3 +1,4 @@
+use crate::quadtree::{Bounds, QuadTree};
 use crate::{
     AppState, PlayerActions, RoundSettings, Winner, ARENA_PADDING, BOID_SCALE, LEADER_SCALE,
 };
@@ -14,6 +15,8 @@ use leafwing_input_manager::prelude::*;
 use std::collections::HashMap;
 use std::f32::consts::FRAC_PI_2;
 use std::mem;
+
+const MAX_BOIDS_PER_NODE: usize = 10;
 
 #[derive(Inspectable, Debug)]
 pub struct BoidSettings {
@@ -151,44 +154,59 @@ impl BoidAveragedInputs {
 
 #[derive(Component, Debug)]
 pub struct Leader;
+pub fn update_quad_tree(
+    mut commands: Commands,
+    query: Query<(Entity, &Transform), With<Boid>>,
+    round_settings: Res<RoundSettings>,
+) {
+    let mut quad_tree = QuadTree::<Entity, MAX_BOIDS_PER_NODE>::new(Bounds {
+        x_min: -round_settings.arena_radius,
+        x_max: round_settings.arena_radius,
+        y_min: -round_settings.arena_radius,
+        y_max: round_settings.arena_radius,
+    });
+    query
+        .iter()
+        .for_each(|(entity, transform)| quad_tree.insert(transform.translation.truncate(), entity));
+    commands.insert_resource(quad_tree);
+}
 
 #[allow(clippy::type_complexity)]
 pub fn update_boid_neighbors(
-    mut query: Query<
-        (
-            Entity,
-            &Transform,
-            &mut BoidNeighborsCaptureRange,
-            &mut BoidNeighborsSeparation,
-        ),
-        With<Boid>,
-    >,
+    mut neighbors_components: Query<(
+        Entity,
+        &Transform,
+        &mut BoidNeighborsCaptureRange,
+        &mut BoidNeighborsSeparation,
+    )>,
     boid_settings: Res<BoidSettings>,
+    quad_tree: Option<Res<QuadTree<Entity, MAX_BOIDS_PER_NODE>>>,
 ) {
-    let positions: Vec<(Entity, Vec3)> = query
-        .iter()
-        .map(|(entity, transform, _, _)| (entity, transform.translation))
-        .collect();
-    let separation_distance_squared =
-        boid_settings.separation_distance * boid_settings.capture_range;
-    let capture_range_squared = boid_settings.capture_range * boid_settings.capture_range;
-    for (entity, transform, mut capture_neighbors, mut separation_neighbors) in query.iter_mut() {
-        let mut c = Vec::new();
-        let mut s = Vec::new();
-        for (target, position) in positions.iter().filter(|(t, _)| t.id() != entity.id()) {
-            let distance_squared = transform
-                .translation
-                .truncate()
-                .distance_squared(position.truncate());
-            if distance_squared < separation_distance_squared {
-                s.push(*target)
-            }
-            if distance_squared < capture_range_squared {
-                c.push(*target);
-            }
+    if let Some(quad_tree) = quad_tree {
+        for (entity, transform, mut capture_neighbors, mut separation_neighbors) in
+            neighbors_components.iter_mut()
+        {
+            let c = quad_tree
+                .query_distance(
+                    transform.translation.truncate(),
+                    boid_settings.capture_range,
+                )
+                .into_iter()
+                .map(|(_, e)| *e)
+                .filter(|e| *e != entity)
+                .collect();
+            let s = quad_tree
+                .query_distance(
+                    transform.translation.truncate(),
+                    boid_settings.separation_distance,
+                )
+                .into_iter()
+                .map(|(_, e)| *e)
+                .filter(|e| *e != entity)
+                .collect();
+            capture_neighbors.entities = c;
+            separation_neighbors.entities = s;
         }
-        capture_neighbors.entities = c;
-        separation_neighbors.entities = s;
     }
 }
 
