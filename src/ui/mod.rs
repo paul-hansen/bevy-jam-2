@@ -34,6 +34,8 @@ impl Plugin for UiAppPlugin {
             .add_system_set(SystemSet::on_enter(AppState::CustomGameMenu).with_system(unlock_mouse))
             .add_system_set(SystemSet::on_exit(AppState::CustomGameMenu).with_system(lock_mouse))
             .add_system(toggle_pause_menu)
+            .add_system(on_focused)
+            .add_system(on_click)
             .add_system(toggle_boid_settings)
             .add_system(toggle_world_inspector)
             .add_system(toggle_fullscreen)

@@ -5,8 +5,9 @@ use crate::{
     AppState, BoidColor, BoidSettings, Bot, GlobalActions, MultiplayerMode, PlayerType,
     RoundSettings, Winner,
 };
+use bevy::input::mouse::MouseButtonInput;
 use bevy::prelude::*;
-use bevy::window::WindowMode;
+use bevy::window::{WindowFocused, WindowMode};
 use bevy_egui::egui::{Align, Align2, InnerResponse, Response, Ui};
 use bevy_egui::{egui, EguiContext};
 use bevy_egui_kbgp::KbgpEguiResponseExt;
@@ -474,6 +475,36 @@ pub fn lock_mouse(mut windows: ResMut<Windows>) {
     let window = windows.get_primary_mut().unwrap();
     window.set_cursor_lock_mode(true);
     window.set_cursor_visibility(false);
+}
+
+pub fn on_focused(
+    mut events: EventReader<WindowFocused>,
+    mut windows: ResMut<Windows>,
+    app_state: Res<State<AppState>>,
+) {
+    for event in events.iter() {
+        if app_state.current().eq(&AppState::Playing) {
+            if let Some(window) = windows.get_mut(event.id) {
+                window.set_cursor_lock_mode(true);
+                window.set_cursor_visibility(false);
+            }
+        }
+    }
+}
+
+pub fn on_click(
+    mut events: EventReader<MouseButtonInput>,
+    mut windows: ResMut<Windows>,
+    app_state: Res<State<AppState>>,
+) {
+    for _ in events.iter() {
+        if app_state.current().eq(&AppState::Playing) {
+            if let Some(window) = windows.get_primary_mut() {
+                window.set_cursor_lock_mode(true);
+                window.set_cursor_visibility(false);
+            }
+        }
+    }
 }
 
 pub fn unlock_mouse(mut windows: ResMut<Windows>) {
