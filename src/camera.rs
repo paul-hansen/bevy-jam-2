@@ -2,7 +2,6 @@ use crate::math::Average;
 use crate::{Camera2d, Leader, PlayerActions, Query, ScalingMode, SCENE_HEIGHT};
 use bevy::math::Vec2Swizzles;
 use bevy::prelude::*;
-use bevy_inspector_egui::Inspectable;
 use leafwing_input_manager::prelude::*;
 use std::time::Duration;
 
@@ -20,10 +19,20 @@ pub fn update_camera_follow_system(
     }
 }
 
-#[derive(Component, Inspectable)]
+#[derive(Component, Reflect)]
+#[reflect(Component)]
 pub struct Camera2dFollow {
     pub target: Entity,
     pub offset: Vec2,
+}
+
+impl FromWorld for Camera2dFollow {
+    fn from_world(world: &mut World) -> Self {
+        Self {
+            target: world.entities().reserve_entity(),
+            offset: default(),
+        }
+    }
 }
 
 pub fn camera_zoom(

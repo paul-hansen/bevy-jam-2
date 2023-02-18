@@ -1,4 +1,5 @@
 use bevy::ecs::system::EntityCommands;
+use bevy::prelude::{FromReflect, Reflect};
 use std::fmt::Formatter;
 
 pub mod bonehead;
@@ -6,7 +7,7 @@ pub mod coward;
 pub mod hunter;
 pub mod speedy;
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Default)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Default, Reflect, FromReflect)]
 pub enum Bot {
     #[default]
     BoneHead,

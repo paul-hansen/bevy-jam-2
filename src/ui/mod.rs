@@ -36,8 +36,6 @@ impl Plugin for UiAppPlugin {
             .add_system(toggle_pause_menu)
             .add_system(on_focused)
             .add_system(on_click)
-            .add_system(toggle_boid_settings)
-            .add_system(toggle_world_inspector)
             .add_system(toggle_fullscreen)
             .add_system_to_stage(CoreStage::PostUpdate, handle_ui_events)
             .insert_resource(UiData::default());

@@ -5,7 +5,7 @@ use leafwing_input_manager::prelude::*;
 use leafwing_input_manager::user_input::InputKind;
 use std::fmt::Formatter;
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Default)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Default, Reflect, FromReflect)]
 pub enum PlayerType {
     #[default]
     AnyDevice,
@@ -146,13 +146,13 @@ impl std::fmt::Display for PlayerType {
     }
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Reflect, FromReflect)]
 pub struct PlayerSettings {
     pub player_type: PlayerType,
     pub color: BoidColor,
 }
 
-#[derive(Debug, Clone, Default, Eq, PartialEq)]
+#[derive(Debug, Clone, Default, Eq, PartialEq, Reflect)]
 pub enum MultiplayerMode {
     #[default]
     SplitScreenVertical,
@@ -170,7 +170,7 @@ impl std::fmt::Display for MultiplayerMode {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Resource, Reflect)]
 pub struct RoundSettings {
     pub players: Vec<PlayerSettings>,
     pub arena_radius: f32,

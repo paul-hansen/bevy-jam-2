@@ -2,24 +2,23 @@ use crate::round::PlayerSettings;
 use crate::ui::style::get_style;
 use crate::ui::Logo;
 use crate::{
-    AppState, BoidColor, BoidSettings, Bot, GlobalActions, MultiplayerMode, PlayerType,
-    RoundSettings, Winner,
+    AppState, BoidColor, Bot, GlobalActions, MultiplayerMode, PlayerType, RoundSettings, Winner,
 };
 use bevy::input::mouse::MouseButtonInput;
 use bevy::prelude::*;
-use bevy::window::{WindowFocused, WindowMode};
+use bevy::window::{CursorGrabMode, WindowFocused, WindowMode};
 use bevy_egui::egui::{Align, Align2, InnerResponse, Response, Ui};
 use bevy_egui::{egui, EguiContext};
 use bevy_egui_kbgp::KbgpEguiResponseExt;
-use bevy_inspector_egui::plugin::InspectorWindows;
-use bevy_inspector_egui::WorldInspectorParams;
 use egui::vec2;
 use leafwing_input_manager::prelude::*;
 use std::fmt::Debug;
 
-#[derive(Debug)]
+#[derive(Debug, Reflect, Resource)]
+#[reflect(Resource)]
 pub struct UiData {
     pub round_settings: RoundSettings,
+    #[reflect(ignore)]
     pub window_mode: WindowMode,
     pub window_width: f32,
     pub window_height: f32,
@@ -417,7 +416,7 @@ pub fn horizontal_right_to_left_top<R>(
 ) -> InnerResponse<InnerResponse<R>> {
     ui.horizontal_top(|ui| {
         ui.with_layout(
-            egui::Layout::right_to_left().with_cross_align(Align::TOP),
+            egui::Layout::right_to_left(Align::Center).with_cross_align(Align::TOP),
             add_contents,
         )
     })
@@ -473,7 +472,7 @@ pub fn toggle_pause_menu(
 
 pub fn lock_mouse(mut windows: ResMut<Windows>) {
     let window = windows.get_primary_mut().unwrap();
-    window.set_cursor_lock_mode(true);
+    window.set_cursor_grab_mode(CursorGrabMode::Locked);
     window.set_cursor_visibility(false);
 }
 
@@ -485,7 +484,7 @@ pub fn on_focused(
     for event in events.iter() {
         if app_state.current().eq(&AppState::Playing) {
             if let Some(window) = windows.get_mut(event.id) {
-                window.set_cursor_lock_mode(true);
+                window.set_cursor_grab_mode(CursorGrabMode::Locked);
                 window.set_cursor_visibility(false);
             }
         }
@@ -500,7 +499,7 @@ pub fn on_click(
     for _ in events.iter() {
         if app_state.current().eq(&AppState::Playing) {
             if let Some(window) = windows.get_primary_mut() {
-                window.set_cursor_lock_mode(true);
+                window.set_cursor_grab_mode(CursorGrabMode::Locked);
                 window.set_cursor_visibility(false);
             }
         }
@@ -509,37 +508,8 @@ pub fn on_click(
 
 pub fn unlock_mouse(mut windows: ResMut<Windows>) {
     let window = windows.get_primary_mut().unwrap();
-    window.set_cursor_lock_mode(false);
+    window.set_cursor_grab_mode(CursorGrabMode::None);
     window.set_cursor_visibility(true);
-}
-
-pub fn toggle_boid_settings(
-    mut inspector_windows: ResMut<InspectorWindows>,
-    action_state: Query<&ActionState<GlobalActions>>,
-    mut windows: ResMut<Windows>,
-) {
-    let action_state = action_state.single();
-    if action_state.just_released(GlobalActions::ToggleBoidSettings) {
-        let inspector_window_data = inspector_windows.window_data_mut::<BoidSettings>();
-        inspector_window_data.visible = !inspector_window_data.visible;
-        let window = windows.get_primary_mut().unwrap();
-        window.set_cursor_lock_mode(!inspector_window_data.visible);
-        window.set_cursor_visibility(inspector_window_data.visible);
-    }
-}
-
-pub fn toggle_world_inspector(
-    action_state: Query<&ActionState<GlobalActions>>,
-    mut world_inspector_params: ResMut<WorldInspectorParams>,
-    mut windows: ResMut<Windows>,
-) {
-    let action_state = action_state.single();
-    if action_state.just_released(GlobalActions::ToggleWorldInspector) {
-        world_inspector_params.enabled = !world_inspector_params.enabled;
-        let window = windows.get_primary_mut().unwrap();
-        window.set_cursor_lock_mode(!world_inspector_params.enabled);
-        window.set_cursor_visibility(world_inspector_params.enabled);
-    }
 }
 
 pub fn toggle_fullscreen(

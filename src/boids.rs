@@ -4,8 +4,7 @@ use crate::{
 };
 use bevy::ecs::schedule::StateError;
 use bevy::prelude::*;
-use bevy_inspector_egui::egui::Ui;
-use bevy_inspector_egui::{Context, Inspectable};
+use bevy_inspector_egui::InspectorOptions;
 use bevy_prototype_debug_lines::DebugLines;
 use itertools::Itertools;
 use leafwing_input_manager::action_state::ActionData;
@@ -18,30 +17,31 @@ use std::mem;
 
 const MAX_BOIDS_PER_NODE: usize = 10;
 
-#[derive(Inspectable, Debug)]
+#[derive(Reflect, Debug, Resource, InspectorOptions)]
+#[reflect(Resource)]
 pub struct BoidSettings {
     pub cohesion_enabled: bool,
     pub separation_enabled: bool,
     pub alignment_enabled: bool,
     /// The maximum speed the boid is allowed to go in units per second
-    #[inspectable(min = 0.0, max = 9999.0)]
+    #[inspector(min = 0.0, max = 9999.0)]
     pub max_speed: f32,
     /// The minimum speed the boid is allowed to go in units per second
-    #[inspectable(min = 0.0, max = 9999.0)]
+    #[inspector(min = 0.0, max = 9999.0)]
     pub min_speed: f32,
     /// The amount the boid's speed changes by in units per second
-    #[inspectable(min = 0.0, max = 9999.0)]
+    #[inspector(min = 0.0, max = 9999.0)]
     pub acceleration: f32,
     /// The deceleration applied to the boid every frame in units per second
-    #[inspectable(min = 0.0, max = 9999.0)]
+    #[inspector(min = 0.0, max = 9999.0)]
     pub drag: f32,
-    #[inspectable(min = 0.0, max = 3600.0)]
+    #[inspector(min = 0.0, max = 3600.0)]
     pub max_turn_rate_per_second: f32,
-    #[inspectable(min = 0.0, max = 1000.0)]
+    #[inspector(min = 0.0, max = 1000.0)]
     pub separation_distance: f32,
-    #[inspectable(min = 0.0, max = 1000.0)]
+    #[inspector(min = 0.0, max = 1000.0)]
     pub capture_range: f32,
-    #[inspectable(min = 0.0, max = 1000.0)]
+    #[inspector(min = 0.0, max = 1000.0)]
     pub vision_range: f32,
     pub debug_lines: bool,
 }
@@ -68,37 +68,22 @@ impl Default for BoidSettings {
 #[derive(Component, Default)]
 pub struct Boid {}
 
-#[derive(Component, Default, Debug, Inspectable)]
+#[derive(Component, Default, Debug, Reflect)]
+#[reflect(Component)]
 pub struct Velocity {
     pub forward: f32,
 }
 
-#[derive(Component, Default)]
+#[derive(Component, Default, Reflect)]
+#[reflect(Component)]
 pub struct BoidNeighborsCaptureRange {
     entities: Vec<Entity>,
 }
 
-impl Inspectable for BoidNeighborsCaptureRange {
-    type Attributes = ();
-
-    fn ui(&mut self, ui: &mut Ui, _: Self::Attributes, _: &mut Context) -> bool {
-        ui.label(format!("{}", self.entities.len()));
-        false
-    }
-}
-
 #[derive(Component, Default, Reflect)]
+#[reflect(Component)]
 pub struct BoidNeighborsSeparation {
     pub entities: Vec<Entity>,
-}
-
-impl Inspectable for BoidNeighborsSeparation {
-    type Attributes = ();
-
-    fn ui(&mut self, ui: &mut Ui, _: Self::Attributes, _: &mut Context) -> bool {
-        ui.label(format!("{}", self.entities.len()));
-        false
-    }
 }
 
 // Collects inputs every frame and averages them.
@@ -152,6 +137,11 @@ impl BoidAveragedInputs {
     }
 }
 
+#[derive(Resource)]
+pub struct BoidTree {
+    tree: QuadTree<Entity, MAX_BOIDS_PER_NODE>,
+}
+
 #[derive(Component, Debug)]
 pub struct Leader;
 pub fn update_quad_tree(
@@ -159,7 +149,7 @@ pub fn update_quad_tree(
     query: Query<(Entity, &Transform), With<Boid>>,
     round_settings: Res<RoundSettings>,
 ) {
-    let mut quad_tree = QuadTree::<Entity, MAX_BOIDS_PER_NODE>::new(Bounds {
+    let mut tree = QuadTree::<Entity, MAX_BOIDS_PER_NODE>::new(Bounds {
         x_min: -round_settings.arena_radius,
         x_max: round_settings.arena_radius,
         y_min: -round_settings.arena_radius,
@@ -167,8 +157,8 @@ pub fn update_quad_tree(
     });
     query
         .iter()
-        .for_each(|(entity, transform)| quad_tree.insert(transform.translation.truncate(), entity));
-    commands.insert_resource(quad_tree);
+        .for_each(|(entity, transform)| tree.insert(transform.translation.truncate(), entity));
+    commands.insert_resource(BoidTree { tree });
 }
 
 #[allow(clippy::type_complexity)]
@@ -180,12 +170,13 @@ pub fn update_boid_neighbors(
         &mut BoidNeighborsSeparation,
     )>,
     boid_settings: Res<BoidSettings>,
-    quad_tree: Option<Res<QuadTree<Entity, MAX_BOIDS_PER_NODE>>>,
+    boid_tree: Option<Res<BoidTree>>,
 ) {
-    if let Some(quad_tree) = quad_tree {
+    if let Some(quad_tree) = &boid_tree {
         for (entity, transform, mut capture_neighbors, mut separation_neighbors) in
             neighbors_components.iter_mut()
         {
+            let quad_tree = &quad_tree.tree;
             let c = quad_tree
                 .query_distance(
                     transform.translation.truncate(),
@@ -210,7 +201,7 @@ pub fn update_boid_neighbors(
     }
 }
 
-#[derive(Component, Eq, PartialEq, Copy, Clone, Debug, Hash, Inspectable)]
+#[derive(Component, Eq, PartialEq, Copy, Clone, Debug, Hash, Reflect, FromReflect)]
 pub enum BoidColor {
     Red,
     Green,
@@ -545,11 +536,10 @@ fn add_axis_input(
     action: PlayerActions,
     axis_data: DualAxisData,
 ) {
-    let mut data = action_state.action_data(action);
+    let mut data = action_state.action_data_mut(action);
     data.value += axis_data.x();
     data.axis_pair = Some(
         data.axis_pair
             .map_or(axis_data, |u| u.merged_with(axis_data)),
     );
-    action_state.set_action_data(action, data);
 }
