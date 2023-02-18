@@ -7,6 +7,8 @@ This game was made for Bevy Jam #2 which you can [find here](https://itch.io/jam
 
 Inspired by the likes of [snake.io](https://snake.io) and [Galcon](https://en.wikipedia.org/wiki/Galcon).
 
+Version 0.4.0 is the version that was submitted to the jam, I've made some updates and fixes since then.
+
 ## Try it out
 You can try it [in your web browser](https://prawl.itch.io/flock-fusion).
 
