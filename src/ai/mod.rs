@@ -1,7 +1,7 @@
 pub mod bots;
 mod systems;
 
-use crate::run_if_playing;
+use crate::AppState;
 use bevy::prelude::*;
 use systems::*;
 
@@ -9,22 +9,22 @@ pub struct AiAppPlugin;
 
 impl Plugin for AiAppPlugin {
     fn build(&self, app: &mut App) {
-        app.add_system_to_stage(CoreStage::PreUpdate, calculate_cohesion_inputs)
-            .add_system_to_stage(
-                CoreStage::PreUpdate,
+        app.add_systems(
+            (
+                calculate_cohesion_inputs,
+                calculate_alignment_inputs.after(calculate_separation_inputs),
                 calculate_separation_inputs.after(calculate_cohesion_inputs),
             )
-            .add_system_to_stage(
-                CoreStage::PreUpdate,
-                calculate_alignment_inputs.after(calculate_separation_inputs),
+                .in_base_set(CoreSet::PreUpdate),
+        )
+        .add_systems(
+            (
+                bots::speedy::update,
+                bots::coward::update,
+                bots::hunter::update,
             )
-            .add_system_set_to_stage(
-                CoreStage::PreUpdate,
-                SystemSet::new()
-                    .with_run_criteria(run_if_playing)
-                    .with_system(bots::speedy::update)
-                    .with_system(bots::coward::update)
-                    .with_system(bots::hunter::update),
-            );
+                .in_base_set(CoreSet::PreUpdate)
+                .distributive_run_if(in_state(AppState::Playing)),
+        );
     }
 }

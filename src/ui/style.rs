@@ -29,13 +29,13 @@ pub fn get_style() -> egui::Style {
                 },
                 hovered: WidgetVisuals {
                     rounding: Rounding::same(15.0),
-                    bg_fill: Color32::from_rgb(255, 80, 80),
+                    weak_bg_fill: Color32::from_rgb(255, 80, 80),
                     fg_stroke: Stroke::new(1.0, Color32::WHITE),
                     ..egui::Visuals::light().widgets.hovered
                 },
                 active: WidgetVisuals {
                     rounding: Rounding::same(15.0),
-                    bg_fill: Color32::from_rgb(230, 50, 50),
+                    weak_bg_fill: Color32::from_rgb(230, 50, 50),
                     fg_stroke: Stroke::new(1.0, Color32::WHITE),
                     ..egui::Visuals::light().widgets.hovered
                 },

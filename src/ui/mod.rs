@@ -10,34 +10,45 @@ use systems::*;
 
 pub struct UiAppPlugin;
 
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Default, States)]
+pub enum UiState {
+    #[default]
+    Title,
+    CustomGameMenu,
+    PauseMenu,
+    SettingsMenu,
+    Hidden,
+}
+
 impl Plugin for UiAppPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<UiEvent>()
+            .add_state::<UiState>()
             .add_startup_system(set_ui_theme)
-            .add_startup_system(lock_mouse)
-            // Settings does not need to lock/unlock mouse since it will be opened from another menu
-            .add_system_set(SystemSet::on_update(AppState::SettingsMenu).with_system(draw_settings))
-            .add_system_set(SystemSet::on_update(AppState::PauseMenu).with_system(draw_pause_menu))
-            .add_system_set(SystemSet::on_enter(AppState::PauseMenu).with_system(unlock_mouse))
-            .add_system_set(SystemSet::on_exit(AppState::PauseMenu).with_system(lock_mouse))
-            .add_system_set(SystemSet::on_update(AppState::GameOver).with_system(draw_game_over))
-            .add_system_set(SystemSet::on_enter(AppState::GameOver).with_system(unlock_mouse))
-            .add_system_set(SystemSet::on_exit(AppState::GameOver).with_system(lock_mouse))
-            .add_system_set(SystemSet::on_update(AppState::Title).with_system(draw_title))
-            .add_system_set(SystemSet::on_enter(AppState::Title).with_system(unlock_mouse))
-            .add_system_set(SystemSet::on_exit(AppState::Title).with_system(lock_mouse))
-            .add_system_set(SystemSet::on_enter(AppState::Title).with_system(on_title_enter))
-            .add_system_set(SystemSet::on_exit(AppState::Title).with_system(on_title_exit))
-            .add_system_set(
-                SystemSet::on_update(AppState::CustomGameMenu).with_system(draw_round_settings),
-            )
-            .add_system_set(SystemSet::on_enter(AppState::CustomGameMenu).with_system(unlock_mouse))
-            .add_system_set(SystemSet::on_exit(AppState::CustomGameMenu).with_system(lock_mouse))
-            .add_system(toggle_pause_menu)
-            .add_system(on_focused)
-            .add_system(on_click)
-            .add_system(toggle_fullscreen)
-            .add_system_to_stage(CoreStage::PostUpdate, handle_ui_events)
-            .insert_resource(UiData::default());
+            .add_startup_system(lock_mouse);
+        // Settings does not need to lock/unlock mouse since it will be opened from another menu
+        app.add_system(draw_settings.in_set(OnUpdate(UiState::SettingsMenu)));
+        app.add_system(draw_pause_menu.in_set(OnUpdate(UiState::PauseMenu)));
+        app.add_system(unlock_mouse.in_schedule(OnEnter(UiState::PauseMenu)));
+        app.add_system(lock_mouse.in_schedule(OnEnter(UiState::Hidden)));
+        app.add_system(draw_game_over.in_set(OnUpdate(AppState::GameOver)));
+        app.add_system(unlock_mouse.in_schedule(OnEnter(AppState::GameOver)));
+        app.add_system(lock_mouse.in_schedule(OnExit(AppState::GameOver)));
+        app.add_system(draw_title.in_set(OnUpdate(AppState::Title)));
+        app.add_system(unlock_mouse.in_schedule(OnEnter(AppState::Title)));
+        app.add_system(lock_mouse.in_schedule(OnExit(AppState::Title)));
+        app.add_system(on_title_enter.in_schedule(OnEnter(AppState::Title)));
+        app.add_system(on_title_exit.in_schedule(OnExit(AppState::Title)));
+        app.add_system(draw_round_settings.in_set(OnUpdate(UiState::CustomGameMenu)));
+        app.add_system(unlock_mouse.in_schedule(OnEnter(UiState::CustomGameMenu)));
+        app.add_system(lock_mouse.in_schedule(OnExit(UiState::CustomGameMenu)));
+        app.add_system(toggle_pause_hotkey);
+        app.add_system(on_focused);
+        app.add_system(on_click);
+        app.add_system(toggle_fullscreen);
+        app.add_system(handle_ui_events.in_base_set(CoreSet::PostUpdate));
+        app.add_system(hide_ui.in_schedule(OnEnter(AppState::Playing)));
+        app.add_system(show_pause_menu.in_schedule(OnEnter(AppState::Paused)));
+        app.insert_resource(UiData::default());
     }
 }

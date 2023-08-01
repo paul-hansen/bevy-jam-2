@@ -1,5 +1,6 @@
 use bevy::prelude::*;
-use bevy_egui::{egui, EguiPlugin};
+use bevy::window::PrimaryWindow;
+use bevy_egui::{egui, EguiContext, EguiPlugin};
 use bevy_inspector_egui::bevy_inspector::ui_for_world;
 use bevy_inspector_egui::DefaultInspectorConfigPlugin;
 
@@ -24,8 +25,9 @@ fn hotkey(world: &mut World, mut show_inspector: Local<bool>) {
         }
     }
     let egui_context = world
-        .resource_mut::<bevy_egui::EguiContext>()
-        .ctx_mut()
+        .query_filtered::<&mut EguiContext, With<PrimaryWindow>>()
+        .single_mut(world)
+        .get_mut()
         .clone();
     let old_style = egui_context.style();
     let inspector_style = egui::style::Style {

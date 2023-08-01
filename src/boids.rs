@@ -2,7 +2,6 @@ use crate::quadtree::{Bounds, QuadTree};
 use crate::{
     AppState, PlayerActions, RoundSettings, Winner, ARENA_PADDING, BOID_SCALE, LEADER_SCALE,
 };
-use bevy::ecs::schedule::StateError;
 use bevy::prelude::*;
 use bevy_inspector_egui::InspectorOptions;
 use bevy_prototype_debug_lines::DebugLines;
@@ -480,7 +479,7 @@ pub fn get_neighbors_of_color_recursive(
         });
 }
 
-pub fn leader_removed(removals: RemovedComponents<Leader>, mut query: Query<&mut Transform>) {
+pub fn leader_removed(mut removals: RemovedComponents<Leader>, mut query: Query<&mut Transform>) {
     for entity in removals.iter() {
         if let Ok(mut transform) = query.get_mut(entity) {
             transform.scale = BOID_SCALE;
@@ -498,7 +497,7 @@ pub fn leader_defeated(
     mut commands: Commands,
     mut event_reader: EventReader<GameEvent>,
     mut query: Query<(Entity, &BoidColor, &mut Sprite)>,
-    mut app_state: ResMut<State<AppState>>,
+    mut next_app_state: ResMut<NextState<AppState>>,
 ) {
     for event in event_reader.iter() {
         match event {
@@ -517,15 +516,7 @@ pub fn leader_defeated(
             }
             GameEvent::GameOver(winner) => {
                 commands.insert_resource(winner.clone());
-                if let Err(e) = app_state.push(AppState::GameOver) {
-                    match e {
-                        StateError::AlreadyInState => {}
-                        StateError::StateAlreadyQueued => {}
-                        StateError::StackEmpty => {
-                            error!("Failed to change app state to game over: {e}")
-                        }
-                    }
-                };
+                next_app_state.set(AppState::GameOver);
             }
         }
     }
@@ -536,7 +527,7 @@ fn add_axis_input(
     action: PlayerActions,
     axis_data: DualAxisData,
 ) {
-    let mut data = action_state.action_data_mut(action);
+    let data = action_state.action_data_mut(action);
     data.value += axis_data.x();
     data.axis_pair = Some(
         data.axis_pair

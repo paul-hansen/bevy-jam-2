@@ -27,7 +27,6 @@ use crate::viewports::{
     set_camera_viewports, PlayerViewports, ViewportLayoutPreference, ViewportRelative,
 };
 use bevy::core_pipeline::clear_color::ClearColorConfig;
-use bevy::ecs::schedule::ShouldRun;
 use bevy::prelude::*;
 use bevy::render::camera::ScalingMode;
 use bevy::window::WindowMode;
@@ -43,16 +42,14 @@ const ARENA_PADDING: f32 = 100.0;
 const BOID_SCALE: Vec3 = Vec3::splat(0.01);
 const LEADER_SCALE: Vec3 = Vec3::splat(0.014);
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Default)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Default, States)]
 pub enum AppState {
     #[default]
     Title,
     LoadRound,
     GameOver,
     Playing,
-    CustomGameMenu,
-    PauseMenu,
-    SettingsMenu,
+    Paused,
 }
 
 #[derive(Debug, Clone, Reflect, Resource)]
@@ -62,7 +59,7 @@ pub struct Winner {
 
 fn main() {
     let mut app = App::new();
-    app.insert_resource(Msaa { samples: 4 })
+    app.insert_resource(Msaa::Sample8)
         .insert_resource(RoundSettings::default())
         .insert_resource(BoidSettings::default())
         .insert_resource(ClearColor(Color::BLACK))
@@ -73,14 +70,15 @@ fn main() {
                     ..default()
                 })
                 .set(WindowPlugin {
-                    window: WindowDescriptor {
+                    primary_window: Some(Window {
                         fit_canvas_to_parent: true,
                         mode: WindowMode::Windowed,
                         ..default()
-                    },
+                    }),
                     ..default()
                 }),
         )
+        .add_state::<AppState>()
         .add_plugin(InspectorPlugin)
         .add_plugin(DebugLinesPlugin::default())
         .add_plugin(InputManagerPlugin::<PlayerActions>::default())
@@ -96,22 +94,22 @@ fn main() {
         .register_type::<BoidAveragedInputs>()
         .register_type::<ViewportRelative>()
         .register_type::<BoidSettings>()
-        .add_state::<AppState>(AppState::default())
         .add_event::<GameEvent>()
         .add_startup_system(setup)
-        .add_system_set(
-            SystemSet::on_enter(AppState::LoadRound)
-                .with_system(setup_game.after(despawn_game))
-                .with_system(despawn_game),
+        .add_systems(
+            (setup_game.after(despawn_game), despawn_game)
+                .in_schedule(OnEnter(AppState::LoadRound)),
         )
-        .add_system_set(SystemSet::on_enter(AppState::Title).with_system(despawn_game))
-        .add_system_to_stage(CoreStage::First, update_quad_tree)
-        .add_system_to_stage(
-            CoreStage::First,
-            update_boid_neighbors.after(update_quad_tree),
+        .add_system(despawn_game.in_schedule(OnEnter(AppState::Title)))
+        .add_systems(
+            (
+                update_quad_tree,
+                update_boid_neighbors.after(update_quad_tree),
+            )
+                .in_base_set(CoreSet::First),
         )
-        .add_system_set(SystemSet::on_update(AppState::Playing).with_system(update_boid_transforms))
-        .add_system_to_stage(CoreStage::Last, clear_inputs)
+        .add_system(update_boid_transforms.in_set(OnUpdate(AppState::Playing)))
+        .add_system(clear_inputs.in_base_set(CoreSet::Last))
         .add_system(update_boid_color)
         .add_system(set_camera_viewports)
         .add_system(update_camera_follow_system)
@@ -119,14 +117,12 @@ fn main() {
         .add_system(remove_camera_follow_target_on_capture)
         .add_system(camera_zoom)
         .add_system(leader_defeated)
-        .add_system_set_to_stage(
-            CoreStage::PreUpdate,
-            SystemSet::new()
-                .with_run_criteria(run_if_playing)
-                .with_system(propagate_boid_color),
+        .add_system(
+            propagate_boid_color
+                .run_if(in_state(AppState::Playing))
+                .in_base_set(CoreSet::PreUpdate),
         )
-        .add_system_to_stage(CoreStage::PostUpdate, leader_removed)
-        .add_system_to_stage(CoreStage::PostUpdate, leader_added);
+        .add_systems((leader_removed, leader_added).in_base_set(CoreSet::PostUpdate));
 
     app.run();
 }
@@ -160,7 +156,7 @@ fn setup(
         .spawn(SpriteBundle {
             texture: asset_server.load("title.png"),
             transform: Transform::from_xyz(0.0, 100.0, 5.0).with_scale(Vec3::splat(0.3)),
-            visibility: Visibility { is_visible: false },
+            visibility: Visibility::Hidden,
             ..default()
         })
         .insert(Logo)
@@ -229,7 +225,7 @@ fn setup(
             ..Default::default()
         },
         camera: Camera {
-            priority: 10,
+            order: 10,
             ..default()
         },
         ..Default::default()
@@ -249,7 +245,7 @@ fn despawn_game(mut commands: Commands, scene_root: Query<Entity, With<SceneRoot
 fn setup_game(
     mut commands: Commands,
     asset_server: ResMut<AssetServer>,
-    mut app_state: ResMut<State<AppState>>,
+    mut app_state: ResMut<NextState<AppState>>,
     round_settings: Res<RoundSettings>,
 ) {
     // Spawn a root node to attach everything to so we can recursively delete everything
@@ -270,7 +266,7 @@ fn setup_game(
                         clear_color: ClearColorConfig::Custom(Color::BLACK),
                     },
                     camera: Camera {
-                        priority: 1000,
+                        order: 1000,
                         ..default()
                     },
                     ..Default::default()
@@ -336,7 +332,7 @@ fn setup_game(
                                 },
                             },
                             camera: Camera {
-                                priority: (1000 + viewport_id) as isize,
+                                order: (1000 + viewport_id) as isize,
                                 ..default()
                             },
                             ..Default::default()
@@ -371,17 +367,5 @@ fn setup_game(
 
         commands.entity(scene_root).add_child(entity);
     }
-    if let Err(e) = app_state.overwrite_set(AppState::Playing) {
-        error!("Error while starting game: {e}")
-    } else {
-        info!("App state transitioned to Playing")
-    };
-}
-
-pub fn run_if_playing(app_state: Res<bevy::prelude::State<AppState>>) -> ShouldRun {
-    if *app_state.current() == AppState::Playing {
-        ShouldRun::Yes
-    } else {
-        ShouldRun::No
-    }
+    app_state.set(AppState::Playing);
 }

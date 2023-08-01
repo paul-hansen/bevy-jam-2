@@ -1,14 +1,14 @@
 use crate::round::PlayerSettings;
 use crate::ui::style::get_style;
-use crate::ui::Logo;
+use crate::ui::{Logo, UiState};
 use crate::{
     AppState, BoidColor, Bot, GlobalActions, MultiplayerMode, PlayerType, RoundSettings, Winner,
 };
 use bevy::input::mouse::MouseButtonInput;
 use bevy::prelude::*;
-use bevy::window::{CursorGrabMode, WindowFocused, WindowMode};
+use bevy::window::{CursorGrabMode, PrimaryWindow, WindowFocused, WindowMode, WindowResolution};
 use bevy_egui::egui::{Align, Align2, InnerResponse, Response, Ui};
-use bevy_egui::{egui, EguiContext};
+use bevy_egui::{egui, EguiContexts};
 use bevy_egui_kbgp::KbgpEguiResponseExt;
 use egui::vec2;
 use leafwing_input_manager::prelude::*;
@@ -40,7 +40,7 @@ impl Default for UiData {
     }
 }
 
-pub fn set_ui_theme(mut ctx: ResMut<EguiContext>) {
+pub fn set_ui_theme(mut ctx: EguiContexts) {
     let mut fonts = egui::FontDefinitions::default();
     fonts.font_data.insert(
         "sans".to_owned(),
@@ -56,8 +56,10 @@ pub fn set_ui_theme(mut ctx: ResMut<EguiContext>) {
 }
 
 pub fn draw_pause_menu(
-    mut egui_context: ResMut<EguiContext>,
-    mut app_state: ResMut<State<AppState>>,
+    mut egui_context: EguiContexts,
+    mut next_app_state: ResMut<NextState<AppState>>,
+    mut next_ui_state: ResMut<NextState<UiState>>,
+    app_state: Res<State<AppState>>,
 ) {
     egui::Window::new("Game Paused")
         .anchor(Align2::CENTER_CENTER, vec2(0.0, 120.0))
@@ -69,43 +71,37 @@ pub fn draw_pause_menu(
             ui.separator();
             ui.set_width(220.0);
             ui.vertical_centered_justified(|ui| {
-                if app_state.inactives().contains(&AppState::Playing)
+                if app_state.0 != AppState::Playing
                     && ui
                         .button("Resume")
                         .kbgp_navigation()
                         .kbgp_initial_focus()
                         .clicked()
                 {
-                    if let Err(e) = app_state.pop() {
-                        error!("Error resuming game: {e}");
-                    };
+                    next_app_state.set(AppState::Playing);
                 }
 
                 if ui.button("Restart").kbgp_navigation().clicked() {
-                    if let Err(e) = app_state.set(AppState::LoadRound) {
-                        error!("Error when restarting game: {e}");
-                    };
+                    next_app_state.set(AppState::LoadRound);
                 }
 
                 if ui.button("Settings").kbgp_navigation().clicked() {
-                    if let Err(e) = app_state.push(AppState::SettingsMenu) {
-                        error!("Error when opening settings menu from pause menu: {e}");
-                    };
+                    next_ui_state.set(UiState::SettingsMenu);
                 }
 
                 if ui.button("Return to Title").kbgp_navigation().clicked() {
-                    if let Err(e) = app_state.set(AppState::Title) {
-                        error!("Error when returning to title: {e}");
-                    };
+                    next_app_state.set(AppState::Title);
+                    next_ui_state.set(UiState::Title);
                 }
             });
         });
 }
 
 pub fn draw_title(
-    mut egui_context: ResMut<EguiContext>,
+    mut egui_context: EguiContexts,
     #[cfg(not(target_arch = "wasm32"))] mut exit: EventWriter<bevy::app::AppExit>,
-    mut app_state: ResMut<State<AppState>>,
+    mut app_state: ResMut<NextState<AppState>>,
+    mut ui_state: ResMut<NextState<UiState>>,
 ) {
     egui::Window::new("Flock Fusion")
         .title_bar(false)
@@ -121,9 +117,7 @@ pub fn draw_title(
                     .kbgp_initial_focus()
                     .clicked()
                 {
-                    if let Err(e) = app_state.set(AppState::LoadRound) {
-                        error!("Error when starting game: {e}");
-                    };
+                    app_state.set(AppState::LoadRound);
                 }
 
                 if ui
@@ -132,9 +126,7 @@ pub fn draw_title(
                     .kbgp_initial_focus()
                     .clicked()
                 {
-                    if let Err(e) = app_state.set(AppState::CustomGameMenu) {
-                        error!("Error when transitioning to round settings: {e}");
-                    };
+                    ui_state.set(UiState::CustomGameMenu);
                 }
                 ui.small("^ Play custom with friends! ^");
 
@@ -144,9 +136,7 @@ pub fn draw_title(
                     .kbgp_initial_focus()
                     .clicked()
                 {
-                    if let Err(e) = app_state.push(AppState::SettingsMenu) {
-                        error!("Error when transitioning to round settings: {e}");
-                    };
+                    ui_state.set(UiState::SettingsMenu);
                 }
 
                 #[cfg(not(target_arch = "wasm32"))]
@@ -162,16 +152,16 @@ pub fn draw_title(
 }
 
 pub fn on_title_enter(mut query: Query<&mut Visibility, With<Logo>>) {
-    query.single_mut().is_visible = true;
+    *query.single_mut() = Visibility::Visible;
 }
 
 pub fn on_title_exit(mut query: Query<&mut Visibility, With<Logo>>) {
-    query.single_mut().is_visible = false;
+    *query.single_mut() = Visibility::Hidden;
 }
 
 pub fn draw_round_settings(
-    mut egui_context: ResMut<EguiContext>,
-    mut app_state: ResMut<State<AppState>>,
+    mut egui_context: EguiContexts,
+    mut app_state: ResMut<NextState<AppState>>,
     mut ui_data: ResMut<UiData>,
     mut round_settings: ResMut<RoundSettings>,
 ) {
@@ -299,15 +289,11 @@ pub fn draw_round_settings(
                         .clicked()
                     {
                         *round_settings = ui_data.round_settings.clone();
-                        if let Err(e) = app_state.set(AppState::LoadRound) {
-                            error!("Error when starting custom game: {e}");
-                        };
+                        app_state.set(AppState::LoadRound);
                     }
                     if ui.button("Back").kbgp_navigation().clicked() {
                         *round_settings = ui_data.round_settings.clone();
-                        if let Err(e) = app_state.set(AppState::Title) {
-                            error!("Error when backing out of custom game: {e}");
-                        };
+                        app_state.set(AppState::Title);
                     }
                 });
             });
@@ -315,8 +301,8 @@ pub fn draw_round_settings(
 }
 
 pub fn draw_game_over(
-    mut egui_context: ResMut<EguiContext>,
-    mut app_state: ResMut<State<AppState>>,
+    mut egui_context: EguiContexts,
+    mut app_state: ResMut<NextState<AppState>>,
     winner: Option<Res<Winner>>,
 ) {
     let title = match winner {
@@ -340,23 +326,19 @@ pub fn draw_game_over(
                     .kbgp_initial_focus()
                     .clicked()
                 {
-                    if let Err(e) = app_state.set(AppState::LoadRound) {
-                        error!("Error when restarting game: {e}");
-                    };
+                    app_state.set(AppState::LoadRound);
                 }
 
                 if ui.button("Return to Title").kbgp_navigation().clicked() {
-                    if let Err(e) = app_state.set(AppState::Title) {
-                        error!("Error when returning to title: {e}");
-                    };
+                    app_state.set(AppState::Title);
                 }
             });
         });
 }
 
 pub fn draw_settings(
-    mut egui_context: ResMut<EguiContext>,
-    mut app_state: ResMut<State<AppState>>,
+    mut egui_context: EguiContexts,
+    mut ui_state: ResMut<NextState<UiState>>,
     mut ui_data: ResMut<UiData>,
     mut ui_event_writer: EventWriter<UiEvent>,
 ) {
@@ -392,16 +374,12 @@ pub fn draw_settings(
                         .kbgp_initial_focus()
                         .clicked()
                     {
-                        if let Err(e) = app_state.pop() {
-                            error!("Error closing settings: {e}");
-                        };
+                        ui_state.set(UiState::Title);
                         ui_event_writer.send(UiEvent::SettingsSaved);
                     }
 
                     if ui.button("Back").kbgp_navigation().clicked() {
-                        if let Err(e) = app_state.pop() {
-                            error!("Error closing settings: {e}");
-                        };
+                        ui_state.set(UiState::Title);
                     }
                 });
             });
@@ -424,19 +402,20 @@ pub fn horizontal_right_to_left_top<R>(
 
 pub fn handle_ui_events(
     mut events: EventReader<UiEvent>,
-    mut windows: ResMut<Windows>,
+    mut windows: Query<&mut Window, With<PrimaryWindow>>,
     ui_data: Res<UiData>,
 ) {
     for event in events.iter() {
         info!("{event:?}");
         match event {
             UiEvent::SettingsSaved => {
-                let window = windows.primary_mut();
-                if window.mode() != ui_data.window_mode {
-                    window.set_mode(ui_data.window_mode);
+                let mut window = windows.single_mut();
+                if window.mode != ui_data.window_mode {
+                    window.mode = ui_data.window_mode;
                 }
-                if window.mode() == WindowMode::SizedFullscreen {
-                    window.set_resolution(ui_data.window_width, ui_data.window_height);
+                if window.mode == WindowMode::SizedFullscreen {
+                    window.resolution =
+                        WindowResolution::new(ui_data.window_width, ui_data.window_height);
                 }
             }
         }
@@ -444,48 +423,42 @@ pub fn handle_ui_events(
 }
 
 /// Handles toggling the Menu app state when the toggle menu button is pressed
-pub fn toggle_pause_menu(
+pub fn toggle_pause_hotkey(
     action_state: Query<&ActionState<GlobalActions>>,
-    mut app_state: ResMut<State<AppState>>,
+    app_state: Res<State<AppState>>,
+    mut next_app_state: ResMut<NextState<AppState>>,
 ) {
     let action_state = action_state.single();
     if action_state.just_pressed(GlobalActions::ToggleMenu) {
-        match app_state.current() {
-            AppState::PauseMenu => {
-                if let Err(e) = app_state.set(AppState::Playing) {
-                    error!("Error while trying to close the menu: {e}");
-                } else {
-                    info!("Transitioning to {:?}", AppState::Playing)
-                }
+        dbg!(&app_state.0);
+        match app_state.0 {
+            AppState::Paused => {
+                next_app_state.set(AppState::Playing);
             }
             AppState::Playing => {
-                if let Err(e) = app_state.push(AppState::PauseMenu) {
-                    error!("Error while trying to open the menu: {e}");
-                } else {
-                    info!("Transitioning to {:?}", AppState::PauseMenu)
-                }
+                next_app_state.set(AppState::Paused);
             }
             _ => {}
         }
     }
 }
 
-pub fn lock_mouse(mut windows: ResMut<Windows>) {
-    let window = windows.get_primary_mut().unwrap();
-    window.set_cursor_grab_mode(CursorGrabMode::Locked);
-    window.set_cursor_visibility(false);
+pub fn lock_mouse(mut windows: Query<&mut Window, With<PrimaryWindow>>) {
+    let mut window = windows.single_mut();
+    window.cursor.grab_mode = CursorGrabMode::Locked;
+    window.cursor.visible = false;
 }
 
 pub fn on_focused(
     mut events: EventReader<WindowFocused>,
-    mut windows: ResMut<Windows>,
+    mut windows: Query<&mut Window>,
     app_state: Res<State<AppState>>,
 ) {
     for event in events.iter() {
-        if app_state.current().eq(&AppState::Playing) {
-            if let Some(window) = windows.get_mut(event.id) {
-                window.set_cursor_grab_mode(CursorGrabMode::Locked);
-                window.set_cursor_visibility(false);
+        if app_state.0 == AppState::Playing {
+            if let Ok(mut window) = windows.get_mut(event.window) {
+                window.cursor.grab_mode = CursorGrabMode::Locked;
+                window.cursor.visible = false;
             }
         }
     }
@@ -493,36 +466,36 @@ pub fn on_focused(
 
 pub fn on_click(
     mut events: EventReader<MouseButtonInput>,
-    mut windows: ResMut<Windows>,
+    mut windows: Query<&mut Window, With<PrimaryWindow>>,
     app_state: Res<State<AppState>>,
 ) {
     for _ in events.iter() {
-        if app_state.current().eq(&AppState::Playing) {
-            if let Some(window) = windows.get_primary_mut() {
-                window.set_cursor_grab_mode(CursorGrabMode::Locked);
-                window.set_cursor_visibility(false);
+        if app_state.0.eq(&AppState::Playing) {
+            if let Ok(mut window) = windows.get_single_mut() {
+                window.cursor.grab_mode = CursorGrabMode::Locked;
+                window.cursor.visible = false;
             }
         }
     }
 }
 
-pub fn unlock_mouse(mut windows: ResMut<Windows>) {
-    let window = windows.get_primary_mut().unwrap();
-    window.set_cursor_grab_mode(CursorGrabMode::None);
-    window.set_cursor_visibility(true);
+pub fn unlock_mouse(mut windows: Query<&mut Window, With<PrimaryWindow>>) {
+    let mut window = windows.single_mut();
+    window.cursor.grab_mode = CursorGrabMode::None;
+    window.cursor.visible = true;
 }
 
 pub fn toggle_fullscreen(
     action_state: Query<&ActionState<GlobalActions>>,
-    mut windows: ResMut<Windows>,
+    mut windows: Query<&mut Window>,
 ) {
     let action_state = action_state.single();
     if action_state.just_released(GlobalActions::ToggleFullScreen) {
-        for window in windows.iter_mut() {
-            if window.is_focused() {
-                match window.mode() {
-                    WindowMode::Windowed => window.set_mode(WindowMode::BorderlessFullscreen),
-                    _ => window.set_mode(WindowMode::Windowed),
+        for mut window in windows.iter_mut() {
+            if window.focused {
+                match window.mode {
+                    WindowMode::Windowed => window.mode = WindowMode::BorderlessFullscreen,
+                    _ => window.mode = WindowMode::Windowed,
                 }
             }
         }
@@ -591,4 +564,12 @@ impl ComboBoxEnum for WindowMode {
         }
         .to_string()
     }
+}
+
+pub fn hide_ui(mut next_ui_state: ResMut<NextState<UiState>>) {
+    next_ui_state.set(UiState::Hidden);
+}
+
+pub fn show_pause_menu(mut next_ui_state: ResMut<NextState<UiState>>) {
+    next_ui_state.set(UiState::PauseMenu);
 }

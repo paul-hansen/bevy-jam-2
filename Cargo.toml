@@ -7,13 +7,13 @@ license = "MIT OR Apache-2.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bevy = "0.9.1"
+bevy = "0.10.1"
 turborand = "0.10.0"
-bevy-inspector-egui = "0.17.0"
-bevy_prototype_debug_lines = "0.9.0"
-leafwing-input-manager = "0.8.0"
-bevy_egui = "0.19.0"
-bevy-egui-kbgp = "0.11.0"
+bevy-inspector-egui = "0.18.3"
+bevy_prototype_debug_lines = "0.10.2"
+leafwing-input-manager = "0.9.2"
+bevy_egui = "0.20.3"
+bevy-egui-kbgp = "0.13.0"
 # itertools was already being pulled in by leafwing-input-manager, might as well use it too.
 itertools = "0.10"
 

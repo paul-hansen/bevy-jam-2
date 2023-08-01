@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use bevy::render::camera::Viewport;
-use bevy::window::WindowResized;
+use bevy::window::{PrimaryWindow, WindowResized};
 
 /// A component that will update the attached camera's viewport to be sized relative to the screen
 /// ```
@@ -107,7 +107,7 @@ impl ViewportRelative {
 }
 
 pub fn set_camera_viewports(
-    windows: Res<Windows>,
+    windows: Query<&Window, With<PrimaryWindow>>,
     mut resize_events: EventReader<WindowResized>,
 
     mut query: Query<(&mut Camera, &ViewportRelative)>,
@@ -117,7 +117,7 @@ pub fn set_camera_viewports(
     // so then each camera always takes up half the screen.
     // A resize_event is sent when the window is first created, allowing us to reuse this system for initial setup.
 
-    let window = windows.primary();
+    let window = windows.single();
     if resize_events.iter().count() != 0 || !added_query.is_empty() {
         for (mut camera, relative_viewport) in query.iter_mut() {
             camera.viewport = Some(Viewport {
